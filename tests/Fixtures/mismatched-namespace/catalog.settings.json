@@ -1,0 +1,9 @@
+{
+    "namespace": "different",
+    "settings": {
+        "page_size": {
+            "type": "int",
+            "default": 24
+        }
+    }
+}

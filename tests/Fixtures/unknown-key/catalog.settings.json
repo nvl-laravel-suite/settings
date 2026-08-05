@@ -1,0 +1,10 @@
+{
+    "namespace": "catalog",
+    "settings": {
+        "page_size": {
+            "type": "int",
+            "default": 24,
+            "unsupported": true
+        }
+    }
+}

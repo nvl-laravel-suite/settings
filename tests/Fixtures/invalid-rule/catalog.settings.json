@@ -1,0 +1,12 @@
+{
+    "namespace": "catalog",
+    "settings": {
+        "page_size": {
+            "type": "int",
+            "default": 24,
+            "rules": [
+                "definitely_not_a_rule"
+            ]
+        }
+    }
+}

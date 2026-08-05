@@ -1,0 +1,4 @@
+interface:
+  display_name: "NVL Settings"
+  short_description: "Build schema-driven runtime settings"
+  default_prompt: "Use $nvl-settings to implement or review definitions, scopes, typed overrides, synchronization, caching, and concurrency."

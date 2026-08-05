@@ -1,0 +1,77 @@
+{
+    "name": "nvl/settings",
+    "description": "Standalone settings package",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "settings", "configuration"],
+    "require": {
+        "php": "^8.3",
+        "ext-filter": "*",
+        "ext-json": "*",
+        "laravel/framework": "^12.0 || ^13.0",
+        "nesbot/carbon": "^2.72 || ^3.0",
+        "nvl/data": "^1.0",
+        "spatie/laravel-data": "^4.23",
+        "spatie/typescript-transformer": "^3.3",
+        "symfony/finder": "^7.0 || ^8.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.10",
+        "laravel/pint": "^1.27",
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Nvl\\Settings\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Nvl\\Settings\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "analyse": "phpstan analyse --memory-limit=2G",
+        "format": "pint --parallel --format agent",
+        "format:test": "pint --parallel --test --format agent",
+        "quality": [
+            "@format:test",
+            "@analyse",
+            "@test"
+        ],
+        "test": "pest --compact"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.x-dev"
+        },
+        "laravel": {
+            "providers": [
+                "Nvl\\Settings\\Providers\\SettingsServiceProvider"
+            ],
+            "aliases": []
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "archive": {
+        "exclude": [
+            "/.temp",
+            "/build",
+            "/coverage",
+            "/.phpunit.cache",
+            "/.phpunit.result.cache",
+            "/phpstan.neon.dist",
+            "/phpunit.xml.dist",
+            "/tests"
+        ]
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
