@@ -147,3 +147,32 @@ test('management routes return stable unknown and stale error contracts', functi
         ->assertNotFound()
         ->assertJsonPath('error.code', 'setting_override_not_found');
 });
+
+test('management writes require an explicit value and optimistic revision', function (): void {
+    config()->set('settings.management.enabled', true);
+    config()->set('settings.management.path', 'api/internal/runtime-settings');
+    config()->set('settings.management.name', 'runtime.settings');
+    config()->set('settings.management.middleware', []);
+    config()->set('settings.management.authorization_ability', 'manage-settings');
+    Gate::define(
+        'manage-settings',
+        static fn (?Authenticatable $actor, string $ability): bool => $ability === 'set',
+    );
+    require __DIR__.'/../routes/api.php';
+    app(DefinitionRepository::class)->fake([
+        'interface.theme' => [
+            'type' => SettingType::Text,
+            'default' => 'light',
+        ],
+    ]);
+
+    $this->putJson('/api/internal/runtime-settings/interface.theme', [
+        'expectedRevision' => 0,
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('value');
+
+    $this->putJson('/api/internal/runtime-settings/interface.theme', [
+        'value' => 'dark',
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('expectedRevision');
+});

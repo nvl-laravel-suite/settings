@@ -14,6 +14,7 @@ use Nvl\Settings\Actions\ResetSettingAction;
 use Nvl\Settings\Actions\SetSettingAction;
 use Nvl\Settings\Actions\ValidateSettingsSourcesAction;
 use Nvl\Settings\Contracts\SettingsAuthorization;
+use Nvl\Settings\Data\Mutations\ExpectedRevisionData;
 use Nvl\Settings\Data\SettingListQueryData;
 use Nvl\Settings\Data\SettingMutationData;
 use Nvl\Settings\Data\SettingsSourceStatusData;
@@ -95,23 +96,10 @@ final class SettingsManagementController extends Controller
     public function update(string $key, Request $request, SetSettingAction $action): JsonResponse
     {
         $this->authorization->authorize(SettingAbility::Set, $key);
-        $request->validate([
-            'value' => ['present'],
-            'expectedRevision' => ['required', 'integer', 'min:0'],
-            'validFrom' => ['sometimes', 'nullable', 'date'],
-            'validUntil' => ['sometimes', 'nullable', 'date'],
-        ]);
-        $data = SettingMutationData::validateAndCreate(array_filter([
-            'key' => $key,
-            'value' => $request->input('value'),
-            'expectedRevision' => $request->integer('expectedRevision'),
-            'validFrom' => $request->input('validFrom'),
-            'validUntil' => $request->input('validUntil'),
-        ], static fn (mixed $value, string $field): bool => ! in_array(
-            $field,
-            ['validFrom', 'validUntil'],
-            true,
-        ) || $request->exists($field), ARRAY_FILTER_USE_BOTH));
+        $data = SettingMutationData::validateAndCreate(array_replace(
+            $request->all(),
+            ['key' => $key],
+        ));
 
         try {
             return response()->json(['data' => $action->execute($data)->toArray()]);
@@ -128,13 +116,11 @@ final class SettingsManagementController extends Controller
     public function reset(string $key, Request $request, ResetSettingAction $action): JsonResponse
     {
         $this->authorization->authorize(SettingAbility::Reset, $key);
-        $request->validate([
-            'expectedRevision' => ['required', 'integer', 'min:1'],
-        ]);
+        $data = ExpectedRevisionData::validateAndCreate($request->all());
 
         try {
             return response()->json([
-                'data' => $action->execute($key, $request->integer('expectedRevision'))->toArray(),
+                'data' => $action->execute($key, $data->expectedRevision)->toArray(),
             ]);
         } catch (UnknownSettingException $exception) {
             return $this->error('unknown_setting', $exception->getMessage(), 404);
