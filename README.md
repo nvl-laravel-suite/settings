@@ -22,7 +22,7 @@ key/value storage, localized content, tenant ownership, or application UI.
 ## Installation
 
 ```bash
-composer require nvl/settings
+composer require nvl/laravel-suite:^1.0
 php artisan migrate
 php artisan vendor:publish --tag=settings-config
 php artisan vendor:publish --tag=settings-migrations
