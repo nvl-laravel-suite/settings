@@ -1,4 +1,6 @@
-# NVL Settings
+# NVL Settings — API and usage
+
+[← NVL Laravel Suite](../../../README.md)
 
 A source-defined, typed runtime settings engine for Laravel applications.
 
