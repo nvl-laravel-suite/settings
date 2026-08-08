@@ -2,6 +2,16 @@
 
 [← NVL Laravel Suite](../../../README.md)
 
+## Quick reference
+
+| Item | Value |
+|---|---|
+| Installed through | `composer require nvl/laravel-suite:^1.0` |
+| Module identifier | `nvl/settings` |
+| PHP namespace | `Nvl\Settings` |
+| Service provider | `Nvl\Settings\Providers\SettingsServiceProvider` |
+| Configuration | `config/settings.php` |
+
 A source-defined, typed runtime settings engine for Laravel applications.
 
 ## Purpose
