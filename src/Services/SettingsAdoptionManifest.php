@@ -93,7 +93,7 @@ final readonly class SettingsAdoptionManifest
         foreach ($replacements as $sourceKey => $targetKey) {
             if (! is_string($sourceKey)
                 || trim($sourceKey) === ''
-                || mb_strlen($sourceKey) > 255
+                || strlen($sourceKey) > 255
                 || ! is_string($targetKey)
                 || trim($targetKey) === '') {
                 throw new InvalidArgumentException('Every Settings adoption replacement must map non-empty string keys.');
