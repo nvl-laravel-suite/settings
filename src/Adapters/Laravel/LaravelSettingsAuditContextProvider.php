@@ -26,16 +26,45 @@ final readonly class LaravelSettingsAuditContextProvider implements SettingsAudi
         $actor = $this->request->user();
 
         return new SettingAuditContextData(
-            actorType: $actor instanceof Model
-                ? $this->bounded($actor->getMorphClass(), 255)
-                : ($actor instanceof Authenticatable ? $this->bounded($actor::class, 255) : null),
-            actorId: $actor instanceof Authenticatable
-                ? $this->bounded((string) $actor->getAuthIdentifier(), 255)
-                : null,
+            actorType: $this->actorType($actor),
+            actorId: $this->actorIdentifier($actor),
             requestId: $this->bounded($this->request->headers->get('X-Request-ID'), 128),
             ipAddress: $this->bounded($this->request->ip(), 64),
             userAgent: $this->bounded($this->request->userAgent(), 1_024),
         );
+    }
+
+    /**
+     * Resolve the stable model alias or concrete contract type for an audit actor.
+     */
+    private function actorType(?Authenticatable $actor): ?string
+    {
+        if ($actor === null) {
+            return null;
+        }
+
+        return $this->bounded(
+            $actor instanceof Model ? $actor->getMorphClass() : $actor::class,
+            255,
+        );
+    }
+
+    /**
+     * Resolve a scalar authentication identifier without coercing unsupported values.
+     */
+    private function actorIdentifier(?Authenticatable $actor): ?string
+    {
+        if ($actor === null) {
+            return null;
+        }
+
+        $identifier = $actor->getAuthIdentifier();
+
+        if (! is_string($identifier) && ! is_int($identifier)) {
+            return null;
+        }
+
+        return $this->bounded((string) $identifier, 255);
     }
 
     /**

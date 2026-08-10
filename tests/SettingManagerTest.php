@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Auth\GenericUser;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -14,6 +16,7 @@ use Nvl\Settings\Actions\GetManySettingsAction;
 use Nvl\Settings\Actions\GetSettingAction;
 use Nvl\Settings\Actions\ResetSettingAction;
 use Nvl\Settings\Actions\SetSettingAction;
+use Nvl\Settings\Adapters\Laravel\LaravelSettingsAuditContextProvider;
 use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Data\SettingMutationData;
 use Nvl\Settings\Enums\SettingType;
@@ -26,6 +29,7 @@ use Nvl\Settings\Services\ConfigOverrideApplier;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Settings\Support\SettingsRules;
 use Nvl\Settings\Testing\InteractsWithSettings;
 use Nvl\Settings\Tests\TestCase;
 
@@ -44,6 +48,32 @@ it('preserves nested settings defaults around consumer overrides', function (): 
         ->and(config('settings.storage.connection'))->toBeNull()
         ->and(config('settings.cache.key'))->toBe('nvl:settings:v2')
         ->and(config('settings.management.enabled'))->toBeFalse();
+});
+
+it('captures non-model audit actors and rejects malformed rule parameters safely', function (): void {
+    $request = Request::create(
+        '/settings',
+        server: [
+            'HTTP_X_REQUEST_ID' => 'request-1',
+            'REMOTE_ADDR' => '127.0.0.1',
+            'HTTP_USER_AGENT' => 'Settings test',
+        ],
+    );
+    $request->setUserResolver(static fn (): GenericUser => new GenericUser([
+        'id' => 'actor-1',
+        'email' => 'actor@example.test',
+    ]));
+    $context = (new LaravelSettingsAuditContextProvider($request))->current();
+
+    expect($context->actorType)->toBe(GenericUser::class)
+        ->and($context->actorId)->toBe('actor-1')
+        ->and($context->requestId)->toBe('request-1')
+        ->and(fn () => SettingsRules::integerListBetweenParameters([
+            'minimum' => '1',
+            'maximum' => '10',
+        ]))->toThrow(InvalidArgumentException::class)
+        ->and(fn () => SettingsRules::integerMapBetweenParameters([1, '10']))
+        ->toThrow(InvalidArgumentException::class);
 });
 
 it('resolves defaults from fake definition', function (): void {

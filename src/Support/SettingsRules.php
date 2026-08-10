@@ -32,7 +32,7 @@ final class SettingsRules
     /**
      * Build the list rule from one portable string rule's parameters.
      *
-     * @param  list<string>  $parameters
+     * @param  array<int|string, mixed>  $parameters
      */
     public static function integerListBetweenParameters(array $parameters): IntegerListBetween
     {
@@ -44,7 +44,7 @@ final class SettingsRules
     /**
      * Build the map rule from one portable string rule's parameters.
      *
-     * @param  list<string>  $parameters
+     * @param  array<int|string, mixed>  $parameters
      */
     public static function integerMapBetweenParameters(array $parameters): IntegerMapBetween
     {
@@ -56,19 +56,20 @@ final class SettingsRules
     /**
      * Validate exactly two canonical integer bounds.
      *
-     * @param  list<string>  $parameters
+     * @param  array<int|string, mixed>  $parameters
      * @return array{int, int}
      */
     private static function integerBounds(array $parameters): array
     {
-        if (count($parameters) !== 2) {
+        if (! array_is_list($parameters) || count($parameters) !== 2) {
             throw new InvalidArgumentException('Settings integer collection rules require minimum and maximum parameters.');
         }
 
         $bounds = [];
 
         foreach ($parameters as $parameter) {
-            if (filter_var($parameter, FILTER_VALIDATE_INT) === false
+            if (! is_string($parameter)
+                || filter_var($parameter, FILTER_VALIDATE_INT) === false
                 || (string) (int) $parameter !== $parameter) {
                 throw new InvalidArgumentException('Settings integer collection bounds must be canonical integers.');
             }
