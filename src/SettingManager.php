@@ -7,6 +7,7 @@ namespace Nvl\Settings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Nvl\Settings\Contracts\SettingRepository;
+use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Events\SettingChanged;
 use Nvl\Settings\Exceptions\UnknownSettingException;
 use Nvl\Settings\Models\Setting;
@@ -27,6 +28,7 @@ final class SettingManager implements SettingRepository
         private readonly DefinitionRepository $definitions,
         private readonly SettingCache $cache,
         private readonly SettingValueValidator $values,
+        private readonly SettingsAuditContextProvider $auditContext,
     ) {}
 
     /**
@@ -163,8 +165,9 @@ final class SettingManager implements SettingRepository
                     $id = $setting->id;
                     $key = $setting->fullKey();
                     $revision = $setting->revision;
-                    $connection->afterCommit(static function () use ($id, $key, $revision): void {
-                        SettingChanged::dispatch($id, $key, $revision, 'set');
+                    $context = $this->auditContext->current();
+                    $connection->afterCommit(static function () use ($context, $id, $key, $revision): void {
+                        SettingChanged::dispatch($id, $key, $revision, 'set', $context);
                     });
                 }
             }
@@ -200,12 +203,14 @@ final class SettingManager implements SettingRepository
             $setting->valid_until = null;
             $setting->save();
             $this->cache->flushAfterCommit();
-            $connection->afterCommit(static function () use ($setting): void {
+            $context = $this->auditContext->current();
+            $connection->afterCommit(static function () use ($context, $setting): void {
                 SettingChanged::dispatch(
                     $setting->id,
                     $setting->fullKey(),
                     $setting->revision,
                     'reset',
+                    $context,
                 );
             });
         });

@@ -93,6 +93,14 @@ final readonly class SettingsDoctor
                 message: "Table [{$table}] exists.",
             ),
             new SettingsDoctorCheckData(
+                key: 'schema.compatibility',
+                severity: 'error',
+                passed: $missing === [],
+                message: $missing === []
+                    ? "Table [{$table}] matches the canonical NVL Settings v1 schema."
+                    : "Table [{$table}] exists but is not the NVL Settings v1 schema; treat it as a legacy name collision and rename it to a staging table before migration or adoption.",
+            ),
+            new SettingsDoctorCheckData(
                 key: 'schema.columns',
                 severity: 'error',
                 passed: $missing === [],

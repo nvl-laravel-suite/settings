@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Nvl\Settings\Providers;
 
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
+use Nvl\Settings\Adapters\Laravel\LaravelSettingsAuditContextProvider;
+use Nvl\Settings\Commands\AdoptCommand;
 use Nvl\Settings\Commands\CacheCommand;
 use Nvl\Settings\Commands\ClearCommand;
 use Nvl\Settings\Commands\DoctorCommand;
@@ -15,6 +18,7 @@ use Nvl\Settings\Commands\ResetCommand;
 use Nvl\Settings\Commands\SyncCommand;
 use Nvl\Settings\Commands\ValidateCommand;
 use Nvl\Settings\Contracts\SettingRepository;
+use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Contracts\SettingsAuthorization;
 use Nvl\Settings\Models\Setting as SettingModel;
 use Nvl\Settings\Observers\SettingCacheObserver;
@@ -23,6 +27,7 @@ use Nvl\Settings\Services\ConfiguredSettingsAuthorization;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\SettingManager;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Settings\Support\SettingsRules;
 use Throwable;
 
 /**
@@ -43,6 +48,10 @@ final class SettingsServiceProvider extends ServiceProvider
         $this->app->singleton(SettingRepository::class, SettingManager::class);
         $this->app->alias(SettingRepository::class, 'settings');
         $this->app->bindIf(SettingsAuthorization::class, ConfiguredSettingsAuthorization::class);
+        $this->app->bindIf(
+            SettingsAuditContextProvider::class,
+            LaravelSettingsAuditContextProvider::class,
+        );
     }
 
     /**
@@ -71,6 +80,7 @@ final class SettingsServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                AdoptCommand::class,
                 SyncCommand::class,
                 ResetCommand::class,
                 CacheCommand::class,
@@ -83,7 +93,28 @@ final class SettingsServiceProvider extends ServiceProvider
 
         SettingModel::observe(SettingCacheObserver::class);
 
+        $this->registerValidationRules();
+
         $this->applyConfigOverrides();
+    }
+
+    /**
+     * Register portable string aliases for first-party JSON collection rules.
+     */
+    private function registerValidationRules(): void
+    {
+        Validator::extend(
+            'settings_integer_list_between',
+            static fn (string $attribute, mixed $value, array $parameters): bool => SettingsRules::integerListBetweenParameters($parameters)
+                ->isValid($value),
+            'The :attribute must be a list of integers inside the configured range.',
+        );
+        Validator::extend(
+            'settings_integer_map_between',
+            static fn (string $attribute, mixed $value, array $parameters): bool => SettingsRules::integerMapBetweenParameters($parameters)
+                ->isValid($value),
+            'The :attribute must be a string-keyed map of integers inside the configured range.',
+        );
     }
 
     /**

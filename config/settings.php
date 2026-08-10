@@ -35,6 +35,11 @@ return [
         'enabled' => true,
     ],
 
+    'adoption' => [
+        'maximum_manifest_bytes' => 1_048_576,
+        'maximum_records' => 10_000,
+    ],
+
     'management' => [
         'enabled' => false,
         'path' => 'api/v1/settings',

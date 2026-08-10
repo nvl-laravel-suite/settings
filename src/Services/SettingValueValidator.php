@@ -23,12 +23,14 @@ final readonly class SettingValueValidator
     public function validate(Definition $definition, mixed $value, string $attribute = 'value'): void
     {
         $validator = Validator::make(
-            [$attribute => $value],
-            [$attribute => [...$definition->type->baseRules(), ...$definition->rules]],
+            ['value' => $value],
+            ['value' => [...$definition->type->baseRules(), ...$definition->rules]],
         );
 
         if ($validator->fails()) {
-            throw new ValidationException($validator);
+            throw ValidationException::withMessages([
+                $attribute => $validator->errors()->get('value'),
+            ]);
         }
 
         try {

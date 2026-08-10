@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Data\SettingMutationData;
 use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Enums\SettingType;
@@ -33,6 +34,7 @@ final readonly class SetSettingAction
         private DefinitionRepository $definitions,
         private SettingCache $cache,
         private SettingValueValidator $values,
+        private SettingsAuditContextProvider $auditContext,
     ) {}
 
     /**
@@ -173,8 +175,9 @@ final readonly class SetSettingAction
                 $id = $setting->id;
                 $key = $setting->fullKey();
                 $revision = $setting->revision;
-                $connection->afterCommit(static function () use ($id, $key, $revision): void {
-                    SettingChanged::dispatch($id, $key, $revision, 'set');
+                $context = $this->auditContext->current();
+                $connection->afterCommit(static function () use ($context, $id, $key, $revision): void {
+                    SettingChanged::dispatch($id, $key, $revision, 'set', $context);
                 });
             }
 

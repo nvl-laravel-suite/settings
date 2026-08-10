@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Settings\Actions;
 
 use Illuminate\Support\Facades\DB;
+use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Events\SettingChanged;
 use Nvl\Settings\Exceptions\StaleSettingVersionException;
@@ -23,6 +24,7 @@ final readonly class ResetSettingAction
     public function __construct(
         private DefinitionRepository $definitions,
         private SettingCache $cache,
+        private SettingsAuditContextProvider $auditContext,
     ) {}
 
     /**
@@ -64,12 +66,14 @@ final readonly class ResetSettingAction
                 $id = $setting->id;
                 $fullKey = $setting->fullKey();
                 $revision = $setting->revision;
+                $context = $this->auditContext->current();
                 $connection->afterCommit(
                     static fn () => SettingChanged::dispatch(
                         $id,
                         $fullKey,
                         $revision,
                         'reset',
+                        $context,
                     ),
                 );
 

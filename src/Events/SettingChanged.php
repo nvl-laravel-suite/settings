@@ -6,6 +6,7 @@ namespace Nvl\Settings\Events;
 
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
+use Nvl\Settings\Data\SettingAuditContextData;
 
 /**
  * Signals a committed runtime setting mutation without serializing its value.
@@ -13,6 +14,8 @@ use Illuminate\Foundation\Events\Dispatchable;
 final readonly class SettingChanged implements ShouldDispatchAfterCommit
 {
     use Dispatchable;
+
+    public SettingAuditContextData $context;
 
     /**
      * Create value-free mutation metadata for committed listeners.
@@ -22,5 +25,8 @@ final readonly class SettingChanged implements ShouldDispatchAfterCommit
         public string $key,
         public int $revision,
         public string $operation,
-    ) {}
+        ?SettingAuditContextData $context = null,
+    ) {
+        $this->context = $context ?? new SettingAuditContextData;
+    }
 }

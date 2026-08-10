@@ -4,6 +4,13 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+- Added a manifest-driven, dry-run-first legacy adoption API/command with
+  explicit key replacements, definition/codec validation, exact count
+  reconciliation, idempotent writes, and same-name schema collision checks.
+- Added replaceable, value-free actor and request context to after-commit
+  `SettingChanged` events.
+- Added portable typed integer list/map rules for JSON setting definitions and
+  fixed dotted canonical keys bypassing root value validation.
 - Excluded tests and development-only analysis configuration from release
   archives, and expanded consumer operational-contract coverage.
 - Consolidated the complete source-defined v1 storage schema into the clean-install create migration.

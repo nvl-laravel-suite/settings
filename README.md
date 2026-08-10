@@ -100,6 +100,36 @@ JSON sources use portable `SettingType` values and string validation rules:
 }
 ```
 
+Definition rules always validate the root setting value. Laravel paths such as
+`value.*` are therefore not definition rules. For typed JSON collections, use
+the first-party root rules in JSON sources:
+
+```json
+{
+    "namespace": "notifications",
+    "settings": {
+        "reminder_minutes": {
+            "type": "json",
+            "default": [5, 15],
+            "rules": ["settings_integer_list_between:1,60"]
+        },
+        "channel_limits": {
+            "type": "json",
+            "default": {"email": 10, "sms": 5},
+            "rules": ["settings_integer_map_between:1,100"]
+        }
+    }
+}
+```
+
+Trusted PHP definitions may use the equivalent deterministic rule objects:
+
+```php
+use Nvl\Settings\Support\SettingsRules;
+
+'rules' => [SettingsRules::integerListBetween(1, 60)],
+```
+
 Definitions may group keys under one level of scopes:
 
 ```php
@@ -120,6 +150,12 @@ Canonical keys are `namespace.key` or `namespace.scope.key`. A declared
 namespace must match the `name.settings.php|json` filename namespace. Discovery
 is sorted and duplicate namespaces or keys, malformed files, invalid types,
 unsafe segments, invalid rules, and invalid override targets fail explicitly.
+Arbitrarily nested canonical keys are intentionally unsupported. During
+adoption, flatten segments after the optional scope into one descriptive
+snake-case key and record every legacy-to-canonical replacement in the
+adoption manifest; for example,
+`core.currency.dual_pricing.enabled` may map to
+`core.currency.dual_pricing_enabled`.
 
 Configure any number of explicit directories or directory globs:
 
@@ -202,6 +238,7 @@ validated against the dates already stored on the row.
 
 Available Actions are:
 
+- `AdoptSettingsAction`
 - `GetSettingAction`
 - `GetManySettingsAction`
 - `ListSettingsAction`
@@ -219,7 +256,11 @@ reset state.
 Set and reset acquire a row lock and reject stale revisions, including
 concurrent first writes. `SettingChanged`
 contains only identifiers and mutation metadata, never the setting value, and
-dispatches after commit. Canonically equivalent repeat writes are no-ops: they
+dispatches after commit. Its `context` snapshot carries optional actor type/id,
+request id, IP address, and user agent. The default
+`SettingsAuditContextProvider` reads bounded values from Laravel's current
+request before commit; applications may replace that contract for their own
+actor and correlation model. Canonically equivalent repeat writes are no-ops: they
 do not advance the revision, refresh synchronization timestamps, flush the
 value cache, or emit `SettingChanged`.
 
@@ -259,6 +300,8 @@ php artisan nvl:settings:reset interface --force
 php artisan nvl:settings:cache
 php artisan nvl:settings:clear
 php artisan nvl:settings:doctor --strict --format=json
+php artisan nvl:settings:adopt storage/adoption/settings.json --format=json
+php artisan nvl:settings:adopt storage/adoption/settings.json --apply --format=json
 ```
 
 `nvl:settings:validate` performs discovery, format parsing, namespace/scope/key
@@ -373,10 +416,39 @@ php artisan nvl:settings:doctor --strict --format=json
 The doctor checks the configured connection/table, required v1 columns,
 identifier type, indexes, duplicate identities, uncached definition discovery,
 cache freshness, canonical stored value encodings, and management route
-security without mutating state. Package
-migrations create the complete clean-install schema and do not mutate an
-unrelated existing table. Duplicate cleanup, identifier conversion, and data
-mapping belong in an application-owned adoption bridge.
+security without mutating state. Its `schema.compatibility` check explicitly
+distinguishes the canonical package schema from a same-name legacy table.
+Package migrations create the complete clean-install schema and do not mutate
+an unrelated existing table.
+
+Adopt an established typed key/value store through a staging table and a
+versioned manifest. Dry-run is the default and performs no writes. It requires
+one explicit replacement for every source row, resolves every target against a
+source definition, decodes and validates values through the target type, checks
+the declared count, and rejects unknown, duplicated, missing, or colliding
+keys. `--apply` writes the complete validated set atomically and reconciles the
+target count. It is safe to repeat; canonical no-op writes keep their revision.
+
+```json
+{
+    "version": 1,
+    "source_connection": "sqlite",
+    "source_table": "legacy_settings",
+    "key_column": "key",
+    "value_column": "value",
+    "expected_count": 2,
+    "key_replacements": {
+        "core.currency.dual_pricing.enabled": "core.currency.dual_pricing_enabled",
+        "notifications.reminders.minutes": "notifications.reminder_minutes"
+    }
+}
+```
+
+When the legacy table is itself named `settings`, keep migrations disabled,
+run Doctor, rename the legacy table to an explicit staging name, create the
+canonical package schema, then run the plan and apply phases. The adoption
+command refuses to read from the configured canonical target table. Manifest
+size and record limits are controlled by `settings.adoption.*`.
 
 ## TypeScript
 
