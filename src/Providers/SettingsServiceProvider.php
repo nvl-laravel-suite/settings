@@ -65,7 +65,7 @@ final class SettingsServiceProvider extends ServiceProvider
             __DIR__.'/../../config/settings.php' => config_path('settings.php'),
         ], 'settings-config');
 
-        $this->publishes([
+        $this->publishesMigrations([
             __DIR__.'/../../database/migrations' => database_path('migrations'),
         ], 'settings-migrations');
         if ((bool) config('settings.migrations.enabled', true)) {

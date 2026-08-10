@@ -37,7 +37,6 @@ key/value storage, localized content, tenant ownership, or application UI.
 composer require nvl/laravel-suite:^1.0
 php artisan migrate
 php artisan vendor:publish --tag=settings-config
-php artisan vendor:publish --tag=settings-migrations
 ```
 
 Package discovery registers `SettingsServiceProvider`. Migrations load
@@ -46,6 +45,14 @@ automatically unless `settings.migrations.enabled` is false.
 ```bash
 php artisan vendor:publish --tag=settings-skills
 ```
+
+Choose exactly one migration owner. For automatic vendor loading, leave
+`settings.migrations.enabled=true` and do not publish `settings-migrations`.
+For host-owned migrations, run
+`php artisan vendor:publish --tag=settings-migrations`, set
+`settings.migrations.enabled=false` before the first migration, and maintain
+the copied files as application migrations. Never run both sources; Laravel
+retimestamps published migrations.
 
 ## Define settings
 
