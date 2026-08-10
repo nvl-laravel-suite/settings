@@ -7,6 +7,7 @@ namespace Nvl\Settings\Providers;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
+use InvalidArgumentException;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Settings\Adapters\Laravel\LaravelSettingsAuditContextProvider;
 use Nvl\Settings\Commands\AdoptCommand;
@@ -105,16 +106,45 @@ final class SettingsServiceProvider extends ServiceProvider
     {
         Validator::extend(
             'settings_integer_list_between',
-            static fn (string $attribute, mixed $value, array $parameters): bool => SettingsRules::integerListBetweenParameters($parameters)
+            static fn (string $attribute, mixed $value, array $parameters): bool => SettingsRules::integerListBetweenParameters(
+                self::validationRuleParameters($parameters),
+            )
                 ->isValid($value),
             'The :attribute must be a list of integers inside the configured range.',
         );
         Validator::extend(
             'settings_integer_map_between',
-            static fn (string $attribute, mixed $value, array $parameters): bool => SettingsRules::integerMapBetweenParameters($parameters)
+            static fn (string $attribute, mixed $value, array $parameters): bool => SettingsRules::integerMapBetweenParameters(
+                self::validationRuleParameters($parameters),
+            )
                 ->isValid($value),
             'The :attribute must be a string-keyed map of integers inside the configured range.',
         );
+    }
+
+    /**
+     * Validate Laravel's untyped rule parameters before entering the public rule factory.
+     *
+     * @param  array<int|string, mixed>  $parameters
+     * @return list<string>
+     */
+    private static function validationRuleParameters(array $parameters): array
+    {
+        if (! array_is_list($parameters)) {
+            throw new InvalidArgumentException('Settings integer collection rule parameters must be a list of strings.');
+        }
+
+        $validatedParameters = [];
+
+        foreach ($parameters as $parameter) {
+            if (! is_string($parameter)) {
+                throw new InvalidArgumentException('Settings integer collection rule parameters must be a list of strings.');
+            }
+
+            $validatedParameters[] = $parameter;
+        }
+
+        return $validatedParameters;
     }
 
     /**

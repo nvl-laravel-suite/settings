@@ -32,7 +32,7 @@ final class SettingsRules
     /**
      * Build the list rule from one portable string rule's parameters.
      *
-     * @param  array<int|string, mixed>  $parameters
+     * @param  list<string>  $parameters
      */
     public static function integerListBetweenParameters(array $parameters): IntegerListBetween
     {
@@ -44,7 +44,7 @@ final class SettingsRules
     /**
      * Build the map rule from one portable string rule's parameters.
      *
-     * @param  array<int|string, mixed>  $parameters
+     * @param  list<string>  $parameters
      */
     public static function integerMapBetweenParameters(array $parameters): IntegerMapBetween
     {
