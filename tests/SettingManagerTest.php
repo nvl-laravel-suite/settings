@@ -446,38 +446,42 @@ it('emits batch events only for settings whose persisted state changed', functio
 
 it('resolves many settings with one storage query while preserving input order', function (): void {
     /** @var TestCase $this */
-    $this->defineSettings([
-        'catalog.first' => ['type' => SettingType::Integer, 'default' => 1],
-        'catalog.second' => ['type' => SettingType::Integer, 'default' => 2],
-        'catalog.third' => ['type' => SettingType::Integer, 'default' => 3],
-    ]);
-    app(SettingRepository::class)->set('catalog.second', 20);
-    DB::flushQueryLog();
-    DB::enableQueryLog();
+    $definitions = [];
 
-    $values = app(GetManySettingsAction::class)->execute([
-        'catalog.third',
-        'catalog.first',
-        'catalog.second',
-        'catalog.first',
-    ]);
-    $queries = array_values(array_filter(
-        DB::getQueryLog(),
-        static fn (array $query): bool => str_starts_with(
-            Str::lower($query['query']),
-            'select',
-        ) && Str::contains($query['query'], 'settings'),
-    ));
+    foreach (range(1, 25) as $index) {
+        $definitions["catalog.item_{$index}"] = [
+            'type' => SettingType::Integer,
+            'default' => $index,
+        ];
+    }
 
-    expect(array_map(static fn ($value): string => $value->key, $values))->toBe([
-        'catalog.third',
-        'catalog.first',
-        'catalog.second',
-    ])->and(array_map(static fn ($value): mixed => $value->value, $values))->toBe([
-        3,
-        1,
-        20,
-    ])->and($queries)->toHaveCount(1);
+    $this->defineSettings($definitions);
+    config()->set('settings.cache.enabled', false);
+    app(SettingRepository::class)->set('catalog.item_2', 20);
+    $measure = static function (array $keys): array {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $values = app(GetManySettingsAction::class)->execute($keys);
+        $queries = array_values(array_filter(
+            DB::getQueryLog(),
+            static fn (array $query): bool => str_starts_with(
+                Str::lower($query['query']),
+                'select',
+            ) && Str::contains($query['query'], 'settings'),
+        ));
+        DB::disableQueryLog();
+
+        return [$values, count($queries)];
+    };
+    [, $singleQueryCount] = $measure(['catalog.item_1']);
+    [$values, $populatedQueryCount] = $measure(array_keys($definitions));
+
+    expect(array_map(static fn ($value): string => $value->key, $values))
+        ->toBe(array_keys($definitions))
+        ->and($values[1]->value)->toBe(20)
+        ->and($singleQueryCount)->toBe(1)
+        ->and($populatedQueryCount)->toBe($singleQueryCount);
 });
 
 it('rejects non-canonical stored scalar and temporal values', function (
