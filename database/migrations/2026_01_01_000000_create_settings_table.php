@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Nvl\Settings\Definitions\Tables\SettingsTables;
 
 return new class extends Migration
 {
@@ -17,10 +18,10 @@ return new class extends Migration
         $connection = is_string($configuredConnection) && $configuredConnection !== ''
             ? $configuredConnection
             : null;
-        $configuredTable = config('settings.storage.table', 'settings');
+        $configuredTable = config('settings.storage.table', SettingsTables::Settings);
         $tableName = is_string($configuredTable) && $configuredTable !== ''
             ? $configuredTable
-            : 'settings';
+            : SettingsTables::Settings;
         $schema = Schema::connection($connection);
 
         if ($schema->hasTable($tableName)) {
@@ -61,10 +62,10 @@ return new class extends Migration
         $connection = is_string($configuredConnection) && $configuredConnection !== ''
             ? $configuredConnection
             : null;
-        $configuredTable = config('settings.storage.table', 'settings');
+        $configuredTable = config('settings.storage.table', SettingsTables::Settings);
         $tableName = is_string($configuredTable) && $configuredTable !== ''
             ? $configuredTable
-            : 'settings';
+            : SettingsTables::Settings;
 
         Schema::connection($connection)->dropIfExists($tableName);
     }

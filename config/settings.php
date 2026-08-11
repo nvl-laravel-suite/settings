@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Nvl\Settings\Definitions\Tables\SettingsTables;
+
 return [
     'discovery' => [
         'paths' => [
@@ -28,7 +30,7 @@ return [
 
     'storage' => [
         'connection' => null,
-        'table' => 'settings',
+        'table' => SettingsTables::Settings,
     ],
 
     'migrations' => [

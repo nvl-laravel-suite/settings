@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Nvl\Settings\Casts\SettingValueCast;
+use Nvl\Settings\Definitions\Tables\SettingsTables;
 use Nvl\Settings\Enums\SettingType;
 
 /**
@@ -69,9 +70,9 @@ final class Setting extends Model
      */
     public function getTable(): string
     {
-        $table = config('settings.storage.table', 'settings');
+        $table = config('settings.storage.table', SettingsTables::Settings);
 
-        return is_string($table) && $table !== '' ? $table : 'settings';
+        return is_string($table) && $table !== '' ? $table : SettingsTables::Settings;
     }
 
     /**
