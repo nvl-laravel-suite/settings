@@ -170,7 +170,8 @@ final readonly class SettingsDoctor
                 ? 'No duplicate setting identities exist.'
                 : 'Duplicate setting identities must be resolved.',
         );
-        $query = DB::connection($model->getConnectionName())->table($table);
+        $connection = DB::connection($model->getConnectionName());
+        $query = $connection->table($table.' as settings_doctor');
         $invalidRowsExist = (clone $query)
             ->where(static function (Builder $query): void {
                 $query
@@ -178,12 +179,12 @@ final readonly class SettingsDoctor
                     ->orWhere('namespace', '')
                     ->orWhereNull('key')
                     ->orWhere('key', '')
-                    ->orWhereRaw('LENGTH(namespace) > 100')
-                    ->orWhereRaw('LENGTH(scope) > 100')
-                    ->orWhereRaw('LENGTH(key) > 100')
+                    ->orWhereRaw('LENGTH(settings_doctor.namespace) > ?', [100])
+                    ->orWhereRaw('LENGTH(settings_doctor.scope) > ?', [100])
+                    ->orWhereRaw('LENGTH(settings_doctor.key) > ?', [100])
                     ->orWhere('revision', '<', 1)
                     ->orWhereNull('definition_hash')
-                    ->orWhereRaw('LENGTH(definition_hash) <> 64')
+                    ->orWhereRaw('LENGTH(settings_doctor.definition_hash) <> ?', [64])
                     ->orWhere(static function (Builder $query): void {
                         $query
                             ->where('has_override', false)
