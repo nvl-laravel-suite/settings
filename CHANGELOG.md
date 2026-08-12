@@ -4,6 +4,8 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-08-12
+
 - Added a manifest-driven, dry-run-first legacy adoption API/command with
   explicit key replacements, definition/codec validation, exact count
   reconciliation, idempotent writes, and same-name schema collision checks.
@@ -49,7 +51,7 @@ All notable changes to `nvl/settings` are documented here.
 - Extracted the atomic synchronization capability from its console adapter and
   tightened schema diagnostics for index uniqueness and multi-row failures.
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-08-08
 
 - Added source-controlled definitions, registered scopes, and typed runtime overrides.
 - Added effective-value and source DTOs, revisions, synchronization, orphan handling, and events.
