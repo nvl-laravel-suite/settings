@@ -27,7 +27,7 @@ key/value storage, localized content, tenant ownership, or application UI.
 
 ## Requirements and dependency
 
-- PHP 8.3 or 8.4
+- PHP 8.4 or newer
 - Laravel 12 or 13
 - `nvl/data` for public DTO and generated TypeScript contracts
 
