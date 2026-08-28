@@ -271,6 +271,41 @@ actor and correlation model. Canonically equivalent repeat writes are no-ops: th
 do not advance the revision, refresh synchronization timestamps, flush the
 value cache, or emit `SettingChanged`.
 
+## Setting change subject reference
+
+`SettingChanged` exposes a value-free `subject` alongside its existing ID,
+key, revision, operation, and audit context. The stable subject shape is
+`type: 'nvl_setting'` plus the setting UUID. It is constructed by the event and
+is not an additional dispatch argument.
+
+An application using `nvl/activity` can therefore record the setting mutation
+without loading the package model:
+
+```php
+use Nvl\Activity\Facades\ActivityLog;
+use Nvl\Activity\Support\ActivitySubjectReference;
+use Nvl\Settings\Events\SettingChanged;
+
+function recordSettingActivity(SettingChanged $event): void
+{
+    ActivityLog::recordForSubjectReference(
+        subject: new ActivitySubjectReference(
+            $event->subject->type,
+            $event->subject->id,
+        ),
+        event: $event->operation,
+        description: 'settings.changed',
+        context: [
+            'key' => $event->key,
+            'revision' => $event->revision,
+        ],
+    );
+}
+```
+
+The event and subject never serialize the setting value. Keep listeners
+idempotent because after-commit events may be handled asynchronously.
+
 ## Repository convenience API
 
 Applications that do not need mutation result DTOs may depend on

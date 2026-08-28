@@ -39,6 +39,37 @@ Use Settings for schema-driven global or runtime configuration. Do not store use
   are the sole fallback source for `get()`.
 - Treat canonically equivalent repeat writes as no-ops; they must not advance
   revisions or emit mutation events.
+- Consume `Nvl\Settings\Events\SettingChanged::$subject` for model-free
+  activity or integration identity. It is
+  `Nvl\Settings\Data\SettingSubjectReferenceData`, containing only the literal
+  type `nvl_setting` and string setting ID. Map those fields to the downstream
+  reference type without querying `Nvl\Settings\Models\Setting`.
+- Do not add a subject constructor argument or include a setting value in the
+  event. The event constructs its value-free subject from its existing ID.
+
+For `nvl/activity`, use the exact model-free recording path:
+
+```php
+use Nvl\Activity\Facades\ActivityLog;
+use Nvl\Activity\Support\ActivitySubjectReference;
+use Nvl\Settings\Events\SettingChanged;
+
+function recordSettingActivity(SettingChanged $event): void
+{
+    ActivityLog::recordForSubjectReference(
+        subject: new ActivitySubjectReference(
+            $event->subject->type,
+            $event->subject->id,
+        ),
+        event: $event->operation,
+        description: 'settings.changed',
+        context: [
+            'key' => $event->key,
+            'revision' => $event->revision,
+        ],
+    );
+}
+```
 
 ## Synchronize and operate
 
