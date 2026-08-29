@@ -29,6 +29,7 @@ use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\SettingManager;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingsRules;
+use Nvl\Support\Traits\MergesPackageConfiguration;
 use Throwable;
 
 /**
@@ -36,12 +37,14 @@ use Throwable;
  */
 final class SettingsServiceProvider extends ServiceProvider
 {
+    use MergesPackageConfiguration;
+
     /**
      * Register package configuration and repository services.
      */
     public function register(): void
     {
-        $this->replaceConfigRecursivelyFrom(__DIR__.'/../../config/settings.php', 'settings');
+        $this->mergePackageConfiguration(__DIR__.'/../../config/settings.php', 'settings');
 
         $this->app->singleton(DefinitionRepository::class);
         $this->app->singleton(SettingCache::class);
