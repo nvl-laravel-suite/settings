@@ -107,6 +107,21 @@ it('discovers and validates equivalent PHP and JSON definition sources', functio
         ->expectsOutputToContain('"valid": true');
 });
 
+it('clears the generated definition discovery map', function (): void {
+    $filesystem = app(Filesystem::class);
+    $path = app(DefinitionRepository::class)->cachePath();
+    $filesystem->ensureDirectoryExists(dirname($path));
+    $filesystem->put($path, '<?php return [];');
+
+    expect($filesystem->exists($path))->toBeTrue();
+
+    $this->artisan('nvl:settings:clear')
+        ->expectsOutputToContain('Settings definition map cache cleared.')
+        ->assertSuccessful();
+
+    expect($filesystem->exists($path))->toBeFalse();
+});
+
 it('rejects malformed JSON and defaults that violate their declared type', function (
     string $fixture,
     string $message,
@@ -158,6 +173,14 @@ it('returns non-zero command status before sync when a source is invalid', funct
     $this->artisan('nvl:settings:validate')
         ->expectsOutputToContain('has an invalid default')
         ->assertFailed();
+    app()->forgetInstance(DefinitionRepository::class);
+    $this->artisan('nvl:settings:validate', ['--format' => 'json'])
+        ->expectsOutputToContain('"valid": false')
+        ->assertFailed();
+    $this->artisan('nvl:settings:validate', ['--format' => 'yaml'])
+        ->expectsOutputToContain('must be text or json')
+        ->assertExitCode(2);
+    app()->forgetInstance(DefinitionRepository::class);
     $this->artisan('nvl:settings:sync')
         ->expectsOutputToContain('has an invalid default')
         ->assertFailed();
@@ -1026,5 +1049,8 @@ it('reports a healthy clean-install schema', function (): void {
     ))->toBeTrue();
 
     $this->artisan('nvl:settings:doctor', ['--strict' => true, '--format' => 'json'])
+        ->assertSuccessful();
+    $this->artisan('nvl:settings:doctor')
+        ->expectsOutputToContain('[PASS]')
         ->assertSuccessful();
 });

@@ -113,8 +113,8 @@ it('runs the adoption command as a non-mutating dry run by default', function ()
     ], JSON_THROW_ON_ERROR));
 
     try {
-        $this->artisan('nvl:settings:adopt', ['manifest' => $path, '--format' => 'json'])
-            ->expectsOutputToContain('"mode": "plan"')
+        $this->artisan('nvl:settings:adopt', ['manifest' => $path])
+            ->expectsOutputToContain('Settings adoption plan is valid; no data was changed.')
             ->assertSuccessful();
         expect(Setting::query()->count())->toBe(0);
 

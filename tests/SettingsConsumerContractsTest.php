@@ -42,7 +42,13 @@ it('exposes a stable value-free subject reference on setting change events', fun
             'id' => 'setting-123',
         ])
         ->and($parameters)->not->toContain('subject')
-        ->and(property_exists($event, 'value'))->toBeFalse();
+        ->and(property_exists($event, 'value'))->toBeFalse()
+        ->and(fn () => new SettingSubjectReferenceData('   '))
+        ->toThrow(InvalidArgumentException::class, 'between 1 and 100')
+        ->and(fn () => new SettingSubjectReferenceData(str_repeat('x', 101)))
+        ->toThrow(InvalidArgumentException::class, 'between 1 and 100')
+        ->and(fn () => new SettingSubjectReferenceData("setting\0id"))
+        ->toThrow(InvalidArgumentException::class, 'without NUL bytes');
 });
 
 it('enforces every public setting codec boundary', function (): void {
