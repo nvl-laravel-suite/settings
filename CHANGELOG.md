@@ -4,6 +4,14 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-08-29
+
+### Changed
+
+- Established `SettingRepository`, typed Actions, value-free event subjects,
+  and the Setting facade as the 2.0 consumer boundary; direct consumer
+  Setting-model queries now fail Suite audit.
+
 ## [1.0.7] - 2026-08-22
 
 ### Changed
