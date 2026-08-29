@@ -6,7 +6,7 @@
 
 | Item | Value |
 |---|---|
-| Installed through | `composer require nvl/laravel-suite:^1.0` |
+| Installed through | `composer require nvl/laravel-suite:^2.0` |
 | Module identifier | `nvl/settings` |
 | PHP namespace | `Nvl\Settings` |
 | Service provider | `Nvl\Settings\Providers\SettingsServiceProvider` |
@@ -28,13 +28,13 @@ key/value storage, localized content, tenant ownership, or application UI.
 ## Requirements and dependency
 
 - PHP 8.4 or newer
-- Laravel 12 or 13
+- Laravel 13
 - `nvl/data` for public DTO and generated TypeScript contracts
 
 ## Installation
 
 ```bash
-composer require nvl/laravel-suite:^1.0
+composer require nvl/laravel-suite:^2.0
 php artisan migrate
 php artisan vendor:publish --tag=settings-config
 ```

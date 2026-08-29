@@ -1,6 +1,6 @@
 ---
 name: nvl-settings
-description: Implement, integrate, test, or review nvl/settings in Laravel 12–13. Use for source-controlled setting definitions, runtime overrides, scopes, typed values, effective-value resolution, synchronization, optimistic concurrency, caching, config overrides, authorization, or schema diagnostics.
+description: Implement, integrate, test, or review nvl/settings in Laravel 13. Use for source-controlled setting definitions, runtime overrides, scopes, typed values, effective-value resolution, synchronization, optimistic concurrency, caching, config overrides, authorization, or schema diagnostics.
 ---
 
 # NVL Settings
