@@ -4,6 +4,11 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Bypass shared caching during settings-connection transactions so reads see pending writes without caching values that can still roll back.
+- Exercise cache serialization and invalidation with real commits in a dedicated test case.
+
 ## [2.0.0] - 2026-08-29
 
 ### Changed

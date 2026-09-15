@@ -29,7 +29,8 @@ final readonly class SettingCache
      */
     public function records(): Collection
     {
-        if (! (bool) config('settings.cache.enabled', true)) {
+        if (! (bool) config('settings.cache.enabled', true)
+            || $this->database->connection((new Setting)->getConnectionName())->transactionLevel() > 0) {
             return $this->fetch();
         }
 

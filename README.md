@@ -446,7 +446,7 @@ The cache is optional and stores primitive attribute arrays rather than PHP
 objects, making it compatible with Laravel 13's hardened cache deserialization.
 Its default key is `nvl:settings:v2`. Invalidation from model saves, deletes,
 canonical Actions, and synchronization runs only after the outer database
-transaction commits. Cache failures and database outages are not converted
+transaction commits. Reads inside a transaction on the settings connection bypass the shared cache, so they see that transaction’s writes without publishing uncommitted values. Cache failures and database outages are not converted
 into defaults.
 
 For an existing table, disable automatic migrations during assessment and run:

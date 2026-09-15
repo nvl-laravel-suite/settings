@@ -79,7 +79,7 @@ function recordSettingActivity(SettingChanged $event): void
   least one persisted override is incompatible with its current definition.
 - Rebuild the discovery map with `nvl:settings:cache` after source changes;
   operational validate/sync commands rescan roots and do not trust stale maps.
-- Keep cache invalidation and events after the outer transaction commits.
+- Keep cache invalidation and events after the outer transaction commits. Reads on a settings connection with an active transaction bypass shared caching and see that transaction’s writes.
 - Preserve live locked overrides and monotonic revisions during synchronization.
 - Filter discovery with `--provider` when required.
 - Use `nvl:settings:list`, `nvl:settings:reset`, `nvl:settings:cache`, and `nvl:settings:clear`.
