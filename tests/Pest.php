@@ -6,6 +6,7 @@ use Nvl\Settings\Tests\SettingsCacheTestCase;
 use Nvl\Settings\Tests\TestCase;
 
 uses(TestCase::class)->in(
+    'Feature/TenantBootstrapSafetyTest.php',
     'SettingManagerTest.php',
     'SettingsAdoptionTest.php',
     'SettingsConsumerContractsTest.php',

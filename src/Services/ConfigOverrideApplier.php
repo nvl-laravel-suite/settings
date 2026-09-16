@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Nvl\Settings\Services;
 
-use Illuminate\Support\Str;
-use Nvl\Settings\Models\Setting;
-use Nvl\Settings\Support\Definition;
-use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Tenancy\Enums\TenantContextMode;
+use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
 
 /**
  * Applies explicitly mapped effective settings to Laravel configuration.
@@ -18,53 +17,28 @@ final readonly class ConfigOverrideApplier
      * Create the configuration override applier.
      */
     public function __construct(
-        private DefinitionRepository $definitions,
-        private SettingCache $cache,
+        private TenantContext $context,
+        private PlatformSettingsReader $settings,
+        private PlatformConfigWriter $writer,
     ) {}
 
     /**
      * Apply every allowed definition mapping, including unsynchronized defaults.
+     *
+     * @throws TenantBoundaryViolation When invoked from tenant or unresolved runtime context
      */
     public function apply(): void
     {
-        if (! (bool) config('settings.overrides.enabled', false)) {
+        $mode = $this->context->snapshot()->mode;
+        if ($mode === TenantContextMode::Tenant || $mode === TenantContextMode::Unresolved) {
+            throw new TenantBoundaryViolation('Settings overrides require the platform bootstrap boundary.');
+        }
+
+        if (! (bool) config('settings.overrides.enabled', false)
+            || ! $this->settings->available()) {
             return;
         }
 
-        $records = $this->cache->records()
-            ->keyBy(static fn (Setting $setting): string => $setting->fullKey());
-
-        foreach ($this->definitions->all() as $key => $definition) {
-            if (! $this->mayOverride($definition)) {
-                continue;
-            }
-
-            $record = $records->get($key);
-            config([
-                $definition->overrides => $record instanceof Setting
-                    ? $record->resolved()
-                    : $definition->default,
-            ]);
-        }
-    }
-
-    /**
-     * Determine whether one definition may override its target.
-     */
-    private function mayOverride(Definition $definition): bool
-    {
-        if ($definition->overrides === null || ! config()->has($definition->overrides)) {
-            return false;
-        }
-
-        $denied = config('settings.overrides.denied', []);
-
-        foreach (is_array($denied) ? $denied : [] as $pattern) {
-            if (is_string($pattern) && Str::is($pattern, $definition->overrides)) {
-                return false;
-            }
-        }
-
-        return true;
+        $this->writer->apply($this->settings->records());
     }
 }

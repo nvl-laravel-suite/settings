@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nvl\Settings\Providers;
 
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -25,12 +24,14 @@ use Nvl\Settings\Models\Setting as SettingModel;
 use Nvl\Settings\Observers\SettingCacheObserver;
 use Nvl\Settings\Services\ConfigOverrideApplier;
 use Nvl\Settings\Services\ConfiguredSettingsAuthorization;
+use Nvl\Settings\Services\PlatformConfigWriter;
+use Nvl\Settings\Services\PlatformSettingsBootstrap;
+use Nvl\Settings\Services\PlatformSettingsReader;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\SettingManager;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingsRules;
 use Nvl\Support\Traits\MergesPackageConfiguration;
-use Throwable;
 
 /**
  * Registers settings discovery, persistence, commands, and optional config overrides.
@@ -48,7 +49,10 @@ final class SettingsServiceProvider extends ServiceProvider
 
         $this->app->singleton(DefinitionRepository::class);
         $this->app->singleton(SettingCache::class);
-        $this->app->singleton(ConfigOverrideApplier::class);
+        $this->app->singleton(PlatformConfigWriter::class);
+        $this->app->scoped(PlatformSettingsReader::class);
+        $this->app->scoped(PlatformSettingsBootstrap::class);
+        $this->app->scoped(ConfigOverrideApplier::class);
         $this->app->singleton(SettingRepository::class, SettingManager::class);
         $this->app->alias(SettingRepository::class, 'settings');
         $this->app->bindIf(SettingsAuthorization::class, ConfiguredSettingsAuthorization::class);
@@ -151,7 +155,7 @@ final class SettingsServiceProvider extends ServiceProvider
     }
 
     /**
-     * Apply opted-in overrides only after the application has booted and the table exists.
+     * Apply opted-in platform overrides inside the provider boot boundary.
      */
     private function applyConfigOverrides(): void
     {
@@ -159,21 +163,6 @@ final class SettingsServiceProvider extends ServiceProvider
             return;
         }
 
-        $this->app->booted(function (): void {
-            $model = new SettingModel;
-            $connection = $model->getConnectionName();
-
-            try {
-                $tableExists = Schema::connection($connection)->hasTable($model->getTable());
-            } catch (Throwable) {
-                return;
-            }
-
-            if (! $tableExists) {
-                return;
-            }
-
-            $this->app->make(ConfigOverrideApplier::class)->apply();
-        });
+        $this->app->make(PlatformSettingsBootstrap::class)->apply();
     }
 }
