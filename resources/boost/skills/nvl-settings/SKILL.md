@@ -101,3 +101,10 @@ unavailable databases, configurable route path/name, authorization, and
 adoption diagnostics. Include serialized cache stores, nullable overrides,
 rollback-safe invalidation/events, strict type changes, one-query bulk reads,
 and management API 404/409 error envelopes.
+
+## Configurable-tenancy release discipline
+
+- Preserve disabled compatibility and package independence; tenant support never creates an undeclared Auth or Suite dependency.
+- Use registered package-owned resources, adoption adapters, Actions, and lifecycle APIs. Never add a generic tenant delete-all path or raw cross-package cleanup.
+- Treat mapping/configuration hashes, interruption checkpoints, conservation evidence, worker context, tenant-leading queries, and standalone consumption as release contracts.
+- The P2 implementation is present, but consolidated runtime verification is pending. Do not claim release readiness until the complete matrix passes.

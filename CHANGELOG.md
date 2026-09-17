@@ -88,3 +88,6 @@ All notable changes to `nvl/settings` are documented here.
 - Added effective-value and source DTOs, revisions, synchronization, orphan handling, and events.
 - Added safe optional Laravel config overrides and unavailable-database boot behavior.
 - Added schema diagnostics and opt-in management routes.
+
+<!-- tenancy-program-p2 -->
+Configurable-tenancy implementation and adoption documentation are present. The final consolidated verification matrix is pending; do not treat this package as release-ready until that gate passes.

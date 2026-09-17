@@ -11,3 +11,6 @@ allowlist Eloquent models for cache unserialization. Cache invalidation and
 setting events are commit-aware so rolled-back values are not exposed.
 Definitions and stored overrides must pass the strict canonical value codec;
 do not bypass Actions or the repository for runtime writes.
+
+<!-- tenancy-program-p2 -->
+The configurable-tenancy implementation is present; its consolidated verification matrix remains pending and no release-readiness claim is made.
