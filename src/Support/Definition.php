@@ -32,6 +32,7 @@ final readonly class Definition
         public array $rules,
         public int $position,
         public ?string $overrides,
+        public bool $tenantOverride,
         public array $metadata,
         public string $source,
     ) {}
@@ -55,6 +56,7 @@ final readonly class Definition
                 ),
                 'position' => $this->position,
                 'overrides' => $this->overrides,
+                'tenant_override' => $this->tenantOverride,
                 'metadata' => $this->metadata,
             ], JSON_THROW_ON_ERROR);
         } catch (InvalidDefinitionException $exception) {

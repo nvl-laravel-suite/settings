@@ -31,7 +31,11 @@ use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\SettingManager;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingsRules;
+use Nvl\Settings\Tenancy\SettingsResourceRegistrar;
 use Nvl\Support\Traits\MergesPackageConfiguration;
+use Nvl\Tenancy\Providers\TenancyServiceProvider;
+use Nvl\Tenancy\Services\TenantAdoptionRegistry;
+use Nvl\Tenancy\Services\TenantResourceRegistry;
 
 /**
  * Registers settings discovery, persistence, commands, and optional config overrides.
@@ -45,15 +49,20 @@ final class SettingsServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->register(TenancyServiceProvider::class);
         $this->mergePackageConfiguration(__DIR__.'/../../config/settings.php', 'settings');
+        (new SettingsResourceRegistrar)->register(
+            $this->app->make(TenantResourceRegistry::class),
+            $this->app->make(TenantAdoptionRegistry::class),
+        );
 
         $this->app->singleton(DefinitionRepository::class);
-        $this->app->singleton(SettingCache::class);
+        $this->app->scoped(SettingCache::class);
         $this->app->singleton(PlatformConfigWriter::class);
         $this->app->scoped(PlatformSettingsReader::class);
         $this->app->scoped(PlatformSettingsBootstrap::class);
         $this->app->scoped(ConfigOverrideApplier::class);
-        $this->app->singleton(SettingRepository::class, SettingManager::class);
+        $this->app->scoped(SettingRepository::class, SettingManager::class);
         $this->app->alias(SettingRepository::class, 'settings');
         $this->app->bindIf(SettingsAuthorization::class, ConfiguredSettingsAuthorization::class);
         $this->app->bindIf(

@@ -195,7 +195,7 @@ final class DefinitionRepository
                         array_keys($config),
                         [
                             'type', 'default', 'description', 'rules',
-                            'position', 'overrides', 'metadata',
+                            'position', 'overrides', 'tenant_override', 'metadata',
                         ],
                     );
 
@@ -249,12 +249,19 @@ final class DefinitionRepository
                     $description = $config['description'] ?? '';
                     $position = $config['position'] ?? 0;
                     $overrides = $config['overrides'] ?? null;
+                    $tenantOverride = $config['tenant_override'] ?? false;
                     $rules = $config['rules'] ?? [];
 
                     if (is_string($overrides) && ! config()->has($overrides)) {
                         throw new InvalidDefinitionException(
                             "Setting [{$fullKey}] targets unknown config key [{$overrides}].",
                         );
+                    }
+                    if (! is_bool($tenantOverride)) {
+                        throw new InvalidDefinitionException("Setting [$fullKey] tenant_override must be boolean.");
+                    }
+                    if ($tenantOverride && is_string($overrides)) {
+                        throw new InvalidDefinitionException("Setting [$fullKey] cannot allow tenant overrides and map process configuration.");
                     }
                     $this->validateRules($fullKey, array_values($rules));
 
@@ -289,6 +296,7 @@ final class DefinitionRepository
                         rules: array_values($rules),
                         position: $position,
                         overrides: $overrides,
+                        tenantOverride: $tenantOverride,
                         metadata: $metadata,
                         source: $file,
                     );
@@ -468,7 +476,7 @@ final class DefinitionRepository
     /**
      * Replace discovered definitions for a test.
      *
-     * @param  array<string, array{type: SettingType, default?: mixed, description?: string, rules?: array<int, mixed>, position?: int, overrides?: string|null, metadata?: array<string, mixed>}>  $definitions
+     * @param  array<string, array{type: SettingType, default?: mixed, description?: string, rules?: array<int, mixed>, position?: int, overrides?: string|null, tenant_override?: bool, metadata?: array<string, mixed>}>  $definitions
      */
     public function fake(array $definitions): void
     {
@@ -508,6 +516,7 @@ final class DefinitionRepository
                 rules: $rules,
                 position: $config['position'] ?? 0,
                 overrides: $config['overrides'] ?? null,
+                tenantOverride: $config['tenant_override'] ?? false,
                 metadata: is_array($config['metadata'] ?? null) ? $config['metadata'] : [],
                 source: 'fake',
             );

@@ -12,6 +12,9 @@ use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Tenancy\ValueObjects\TenantJobEnvelope;
 
 /**
  * Clears one override while preserving its synchronized definition fallback.
@@ -25,6 +28,8 @@ final readonly class ResetSettingAction
         private DefinitionRepository $definitions,
         private SettingCache $cache,
         private SettingsAuditContextProvider $auditContext,
+        private TenantBoundary $boundary,
+        private TenantContext $tenantContext,
     ) {}
 
     /**
@@ -42,7 +47,7 @@ final readonly class ResetSettingAction
                 $key,
                 $expectedRevision,
             ): Setting {
-                $setting = Setting::query()->where([
+                $setting = $this->boundary->query(Setting::query(), 'settings.values')->where([
                     'namespace' => $definition->namespace,
                     'scope' => $definition->scope,
                     'key' => $definition->key,
@@ -66,15 +71,12 @@ final readonly class ResetSettingAction
                 $id = $setting->id;
                 $fullKey = $setting->fullKey();
                 $revision = $setting->revision;
+                $tenantId = is_string($setting->tenant_id) ? $setting->tenant_id : null;
+                $ownershipKey = $setting->ownership_key;
                 $context = $this->auditContext->current();
+                $event = new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
                 $connection->afterCommit(
-                    static fn () => SettingChanged::dispatch(
-                        $id,
-                        $fullKey,
-                        $revision,
-                        'reset',
-                        $context,
-                    ),
+                    static fn () => event($event),
                 );
 
                 return $setting;

@@ -12,6 +12,7 @@ return [
             'default' => 'light',
             'rules' => ['in:light,dark'],
             'description' => 'Default interface theme.',
+            'tenant_override' => true,
             'metadata' => ['group' => 'appearance'],
         ],
     ],

@@ -14,6 +14,7 @@ use Nvl\Settings\Data\SettingSyncResultData;
 use Nvl\Settings\Enums\SettingPruneStrategy;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Aligns persisted settings with source definitions without replacing live overrides.
@@ -32,6 +33,7 @@ final readonly class SettingSynchronizer
         private DatabaseManager $database,
         private SettingValueValidator $values,
         private SettingCache $cache,
+        private TenantBoundary $boundary,
     ) {}
 
     /**
@@ -91,6 +93,7 @@ final readonly class SettingSynchronizer
                 if (! $setting instanceof Setting) {
                     Setting::query()->insertOrIgnore([
                         'id' => (string) Str::uuid(),
+                        ...$this->boundary->attributes('settings.values'),
                         'namespace' => $definition->namespace,
                         'scope' => $definition->scope,
                         'key' => $definition->key,
@@ -268,7 +271,7 @@ final readonly class SettingSynchronizer
      */
     private function existingQuery(?string $provider): Builder
     {
-        return Setting::query()->when(
+        return $this->boundary->query(Setting::query(), 'settings.values')->when(
             $provider !== null,
             static fn (Builder $query): Builder => $query->where('namespace', $provider),
         );
@@ -281,7 +284,7 @@ final readonly class SettingSynchronizer
      */
     private function identityQuery(Definition $definition): Builder
     {
-        return Setting::query()->where([
+        return $this->boundary->query(Setting::query(), 'settings.values')->where([
             'namespace' => $definition->namespace,
             'scope' => $definition->scope,
             'key' => $definition->key,

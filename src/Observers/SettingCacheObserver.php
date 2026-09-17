@@ -23,7 +23,7 @@ final readonly class SettingCacheObserver implements ShouldHandleEventsAfterComm
      */
     public function saved(Setting $setting): void
     {
-        $this->cache->flush();
+        $this->cache->flushIdentity($this->cache->identityFor($setting));
     }
 
     /**
@@ -31,6 +31,6 @@ final readonly class SettingCacheObserver implements ShouldHandleEventsAfterComm
      */
     public function deleted(Setting $setting): void
     {
-        $this->cache->flush();
+        $this->cache->flushIdentity($this->cache->identityFor($setting));
     }
 }

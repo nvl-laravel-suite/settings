@@ -15,6 +15,7 @@ use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Returns a deterministic, bounded management page of setting definitions and values.
@@ -26,6 +27,7 @@ final readonly class ListSettingsAction
      */
     public function __construct(
         private DefinitionRepository $definitions,
+        private TenantBoundary $boundary,
     ) {}
 
     /**
@@ -80,7 +82,7 @@ final readonly class ListSettingsAction
         $records = collect();
 
         if ($pageDefinitions !== []) {
-            $records = Setting::query()
+            $records = $this->boundary->query(Setting::query(), 'settings.values')
                 ->where(function (Builder $query) use ($pageDefinitions): void {
                     foreach ($pageDefinitions as $definition) {
                         $query->orWhere(function (Builder $identity) use ($definition): void {

@@ -20,6 +20,10 @@ use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Services\SettingValueValidator;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Tenancy\Contracts\TenantContext;
+use Nvl\Tenancy\ValueObjects\TenantJobEnvelope;
 use Spatie\LaravelData\Optional;
 
 /**
@@ -35,6 +39,8 @@ final readonly class SetSettingAction
         private SettingCache $cache,
         private SettingValueValidator $values,
         private SettingsAuditContextProvider $auditContext,
+        private TenantBoundary $boundary,
+        private TenantContext $tenantContext,
     ) {}
 
     /**
@@ -45,6 +51,10 @@ final readonly class SetSettingAction
     public function execute(SettingMutationData $data): SettingValueData
     {
         $definition = $this->definitions->get($data->key);
+        $ownership = $this->boundary->attributes('settings.values');
+        if (isset($ownership['tenant_id']) && ! $definition->tenantOverride) {
+            throw new TenantBoundaryViolation('This setting does not permit tenant overrides.');
+        }
         $this->values->validate($definition, $data->value);
         $providedValidFrom = $this->parseValidity('validFrom', $data->validFrom);
         $providedValidUntil = $this->parseValidity('validUntil', $data->validUntil);
@@ -76,7 +86,7 @@ final readonly class SetSettingAction
             $serializedMetadata,
             $serializedValue,
         ): Setting {
-            $setting = Setting::query()->where([
+            $setting = $this->boundary->query(Setting::query(), 'settings.values')->where([
                 'namespace' => $definition->namespace,
                 'scope' => $definition->scope,
                 'key' => $definition->key,
@@ -108,6 +118,7 @@ final readonly class SetSettingAction
                 $now = now();
                 $inserted = Setting::query()->insertOrIgnore([
                     'id' => (string) Str::uuid(),
+                    ...$this->boundary->attributes('settings.values'),
                     'namespace' => $definition->namespace,
                     'scope' => $definition->scope,
                     'key' => $definition->key,
@@ -125,7 +136,7 @@ final readonly class SetSettingAction
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
-                $setting = Setting::query()->where([
+                $setting = $this->boundary->query(Setting::query(), 'settings.values')->where([
                     'namespace' => $definition->namespace,
                     'scope' => $definition->scope,
                     'key' => $definition->key,
@@ -175,10 +186,11 @@ final readonly class SetSettingAction
                 $id = $setting->id;
                 $key = $setting->fullKey();
                 $revision = $setting->revision;
+                $tenantId = is_string($setting->tenant_id) ? $setting->tenant_id : null;
+                $ownershipKey = $setting->ownership_key;
                 $context = $this->auditContext->current();
-                $connection->afterCommit(static function () use ($context, $id, $key, $revision): void {
-                    SettingChanged::dispatch($id, $key, $revision, 'set', $context);
-                });
+                $event = new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
+                $connection->afterCommit(static fn () => event($event));
             }
 
             return $setting;

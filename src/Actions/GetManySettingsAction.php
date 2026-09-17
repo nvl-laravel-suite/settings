@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Resolves a bounded collection of setting keys with one storage query.
@@ -18,7 +19,10 @@ final readonly class GetManySettingsAction
     /**
      * Create the bulk settings read action.
      */
-    public function __construct(private DefinitionRepository $definitions) {}
+    public function __construct(
+        private DefinitionRepository $definitions,
+        private TenantBoundary $boundary,
+    ) {}
 
     /**
      * @param  list<string>  $keys
@@ -42,7 +46,7 @@ final readonly class GetManySettingsAction
             return [];
         }
 
-        $records = Setting::query()
+        $records = $this->boundary->query(Setting::query(), 'settings.values')
             ->where(function (Builder $query) use ($definitions): void {
                 foreach ($definitions as $definition) {
                     $query->orWhere(function (Builder $identity) use ($definition): void {

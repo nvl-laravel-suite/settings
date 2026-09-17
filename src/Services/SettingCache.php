@@ -8,6 +8,8 @@ use Illuminate\Contracts\Cache\Factory;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Collection;
 use Nvl\Settings\Models\Setting;
+use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Tenancy\Services\TenantBoundary;
 
 /**
  * Caches setting records as primitive attributes and invalidates them after commits.
@@ -20,6 +22,8 @@ final readonly class SettingCache
     public function __construct(
         private Factory $cache,
         private DatabaseManager $database,
+        private DefinitionRepository $definitions,
+        private TenantBoundary $boundary,
     ) {}
 
     /**
@@ -34,8 +38,9 @@ final readonly class SettingCache
             return $this->fetch();
         }
 
-        $store = $this->cache->store($this->store());
-        $key = $this->key();
+        $identity = $this->identity();
+        $store = $this->cache->store($identity->store);
+        $key = $identity->key;
         $payload = $store->get($key);
 
         if (! $this->isValidPayload($payload)) {
@@ -63,7 +68,44 @@ final readonly class SettingCache
      */
     public function flush(): void
     {
-        $this->cache->store($this->store())->forget($this->key());
+        $this->flushIdentity($this->identity());
+    }
+
+    /** Return the immutable identity for the current admitted partition. */
+    public function identity(): SettingCacheIdentity
+    {
+        $connection = $this->database->connection((new Setting)->getConnectionName());
+        $hashes = array_map(
+            static fn ($definition): string => $definition->hash(),
+            $this->definitions->all(),
+        );
+        sort($hashes);
+
+        $ownership = $this->boundary->attributes('settings.values')['ownership_key'] ?? 'disabled';
+
+        return $this->makeIdentity($connection->getName(), $ownership, $hashes);
+    }
+
+    /** Derive a stable identity directly from a persisted row. */
+    public function identityFor(Setting $setting): SettingCacheIdentity
+    {
+        $hashes = array_map(
+            static fn ($definition): string => $definition->hash(),
+            $this->definitions->all(),
+        );
+        sort($hashes);
+
+        return $this->makeIdentity(
+            $setting->getConnection()->getName(),
+            (string) ($setting->getRawOriginal('ownership_key') ?: 'disabled'),
+            $hashes,
+        );
+    }
+
+    /** Forget one previously captured cache identity. */
+    public function flushIdentity(SettingCacheIdentity $identity): void
+    {
+        $this->cache->store($identity->store)->forget($identity->key);
     }
 
     /**
@@ -72,16 +114,17 @@ final readonly class SettingCache
     public function flushAfterCommit(): void
     {
         $connection = $this->database->connection((new Setting)->getConnectionName());
+        $identity = $this->identity();
 
         if ($connection->transactionLevel() === 0) {
-            $this->flush();
+            $this->flushIdentity($identity);
 
             return;
         }
 
         $connection->afterCommit(fn (): bool => $this->cache
-            ->store($this->store())
-            ->forget($this->key()));
+            ->store($identity->store)
+            ->forget($identity->key));
     }
 
     /**
@@ -91,7 +134,7 @@ final readonly class SettingCache
      */
     private function fetch(): Collection
     {
-        return Setting::query()->get();
+        return $this->boundary->query(Setting::query(), 'settings.values')->get();
     }
 
     /**
@@ -120,6 +163,8 @@ final readonly class SettingCache
 
         $required = [
             'id',
+            'tenant_id',
+            'ownership_key',
             'namespace',
             'scope',
             'key',
@@ -208,5 +253,14 @@ final readonly class SettingCache
         $key = config('settings.cache.key', 'nvl:settings:v2');
 
         return is_string($key) && $key !== '' ? $key : 'nvl:settings:v2';
+    }
+
+    /** Build one deterministic cache key without consulting ambient context. */
+    private function makeIdentity(string $connection, string $ownership, array $definitionHashes): SettingCacheIdentity
+    {
+        return new SettingCacheIdentity($this->store(), implode(':', [
+            $this->key(),
+            hash('sha256', implode('|', [$connection, $ownership, ...$definitionHashes])),
+        ]));
     }
 }

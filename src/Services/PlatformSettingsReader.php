@@ -36,16 +36,21 @@ final readonly class PlatformSettingsReader
     {
         $setting = new Setting;
         $connection = $setting->getConnection();
-        $this->installation->assertUnadopted($connection);
         $schema = $connection->getSchemaBuilder();
 
         if (! $schema->hasTable($setting->getTable())) {
             return false;
         }
 
-        if ($schema->hasColumn($setting->getTable(), 'ownership_key')
-            || $schema->hasColumn($setting->getTable(), 'tenant_id')) {
+        $hasOwnership = $schema->hasColumn($setting->getTable(), 'ownership_key');
+        $hasTenant = $schema->hasColumn($setting->getTable(), 'tenant_id');
+        if ($hasOwnership !== $hasTenant) {
             throw new TenantSchemaNotReady('The Settings ownership schema is not active for this deployment.');
+        }
+        if ($hasOwnership) {
+            $this->installation->assertUsable('settings.values', $connection);
+        } else {
+            $this->installation->assertUnadopted($connection, 'settings.values');
         }
 
         return true;
@@ -73,7 +78,12 @@ final readonly class PlatformSettingsReader
             return (new Setting)->newCollection();
         }
 
-        return Setting::query()
+        $query = Setting::query();
+        if ($query->getModel()->getConnection()->getSchemaBuilder()->hasColumn($query->getModel()->getTable(), 'ownership_key')) {
+            $query->where('ownership_key', 'platform');
+        }
+
+        return $query
             ->where(function (Builder $query) use ($definitions): void {
                 foreach ($definitions as $definition) {
                     $query->orWhere(function (Builder $definitionQuery) use ($definition): void {
