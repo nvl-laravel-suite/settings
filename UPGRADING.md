@@ -1,5 +1,12 @@
 # Upgrading NVL Settings
 
+## Tenant adoption
+
+Install the tenancy expansion migration, prepare a reviewed assignment map,
+and run the foundation `prepare/backfill/verify/activate` lifecycle. Do not
+disable tenancy after duplicate keys exist in separate ownership partitions.
+Config-mapped definitions cannot permit tenant overrides.
+
 ## Upgrading to 1.0
 
 Version 1.0 replaces the old low-level table with UUID records, source-controlled definitions, scope, fallback, metadata, hashes, revisions, and synchronization timestamps.

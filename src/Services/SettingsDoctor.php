@@ -81,6 +81,10 @@ final readonly class SettingsDoctor
             'has_override', 'definition_hash', 'revision', 'metadata', 'valid_from',
             'valid_until', 'synced_at', 'orphaned_at', 'created_at', 'updated_at',
         ];
+        $tenantEnabled = config('tenancy.enabled') === true;
+        if ($tenantEnabled) {
+            $required = [...$required, 'tenant_id', 'ownership_key'];
+        }
         $missing = array_values(array_filter(
             $required,
             static fn (string $column): bool => ! $schema->hasColumn($table, $column),
@@ -124,7 +128,9 @@ final readonly class SettingsDoctor
         $indexes = collect($schema->getIndexes($table));
         $requiredIndexes = [
             'identity' => [
-                'columns' => ['namespace', 'scope', 'key'],
+                'columns' => $tenantEnabled
+                    ? ['ownership_key', 'namespace', 'scope', 'key']
+                    : ['namespace', 'scope', 'key'],
                 'unique' => true,
             ],
             'namespace-scope' => [
@@ -140,6 +146,12 @@ final readonly class SettingsDoctor
                 'unique' => false,
             ],
         ];
+        if ($tenantEnabled) {
+            $requiredIndexes['tenant-lookup'] = [
+                'columns' => ['tenant_id', 'namespace', 'scope', 'key'],
+                'unique' => false,
+            ];
+        }
 
         foreach ($requiredIndexes as $key => $requirement) {
             $index = $indexes->first(
@@ -157,9 +169,12 @@ final readonly class SettingsDoctor
             );
         }
 
+        $identityColumns = $tenantEnabled
+            ? ['ownership_key', 'namespace', 'scope', 'key']
+            : ['namespace', 'scope', 'key'];
         $duplicatesExist = Setting::query()
-            ->select(['namespace', 'scope', 'key'])
-            ->groupBy(['namespace', 'scope', 'key'])
+            ->select($identityColumns)
+            ->groupBy($identityColumns)
             ->havingRaw('COUNT(*) > 1')
             ->exists();
         $checks[] = new SettingsDoctorCheckData(
@@ -199,6 +214,16 @@ final readonly class SettingsDoctor
                 ),
             )
             ->exists();
+        if ($tenantEnabled) {
+            foreach ((clone $query)->select(['tenant_id', 'ownership_key'])->cursor() as $ownership) {
+                $tenantId = is_string($ownership->tenant_id) ? $ownership->tenant_id : null;
+                $expected = $tenantId === null ? 'platform' : 'tenant:'.$tenantId;
+                if (! is_string($ownership->ownership_key) || ! hash_equals($expected, $ownership->ownership_key)) {
+                    $invalidRowsExist = true;
+                    break;
+                }
+            }
+        }
         $checks[] = new SettingsDoctorCheckData(
             key: 'schema.row-integrity',
             severity: 'error',

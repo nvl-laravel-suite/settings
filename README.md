@@ -494,6 +494,14 @@ size and record limits are controlled by `settings.adoption.*`.
 
 ## TypeScript
 
+## Tenant ownership
+
+Definitions remain immutable platform source. A definition must opt in with
+`tenant_override=true` before a tenant may store a value. Adopt existing rows
+through the Settings tenancy adapter; mixed platform/tenant identities use the
+persisted ownership discriminator, and cache invalidation uses the captured
+row identity rather than ambient worker context.
+
 ```bash
 php artisan nvl:data:types:generate
 php artisan nvl:data:types:check

@@ -7,6 +7,10 @@ description: Implement, integrate, test, or review nvl/settings in Laravel 13. U
 
 Use Settings for schema-driven global or runtime configuration. Do not store user preferences, secrets, UI state, or arbitrary model metadata here.
 
+When tenancy is enabled, treat definitions as platform source and values as
+owned rows. Require `tenant_override=true`, use `SettingRepository` only inside
+an admitted context, and never apply tenant values to Laravel's global Config.
+
 ## Define settings
 
 - Keep definitions in source control as `*.settings.php` or

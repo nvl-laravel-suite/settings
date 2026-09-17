@@ -4,6 +4,11 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Added mixed platform/tenant setting ownership, immutable opt-in definitions,
+  captured cache identities, package adoption, and tenant-aware diagnostics.
+
 ### Fixed
 
 - Bypass shared caching during settings-connection transactions so reads see pending writes without caching values that can still roll back.
