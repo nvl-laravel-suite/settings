@@ -11,7 +11,7 @@ uses(TestCase::class)->in(
     'SettingsAdoptionTest.php',
     'SettingsConsumerContractsTest.php',
     'SettingsManagementApiTest.php',
-    'Tenancy',
+    'Tenancy/AdoptionTest.php',
 );
 
 uses(SettingsCacheTestCase::class)->in('SettingsCacheTest.php');

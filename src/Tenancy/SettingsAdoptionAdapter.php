@@ -66,7 +66,11 @@ final readonly class SettingsAdoptionAdapter implements TenantAdoptionAdapter
         );
     }
 
-    /** Verify discriminator consistency and identity uniqueness. */
+    /**
+     * Verify discriminator consistency and identity uniqueness.
+     *
+     * @phpstan-impure
+     */
     public function verify(TenantAdoptionPlan $plan): TenantVerification
     {
         $connection = $this->connection($plan);
@@ -81,7 +85,7 @@ final readonly class SettingsAdoptionAdapter implements TenantAdoptionAdapter
             $tenantId = is_string($row->tenant_id) ? $row->tenant_id : null;
             $expected = $tenantId === null ? 'platform' : 'tenant:'.$tenantId;
             if (! is_string($row->ownership_key) || ! hash_equals($expected, $row->ownership_key)) {
-                $errors[] = 'settings.ownership_discriminator:'.(string) $row->id;
+                $errors[] = 'settings.ownership_discriminator:'.(is_string($row->id) || is_int($row->id) ? (string) $row->id : 'unknown');
             }
             if (count($errors) >= 100) {
                 break;

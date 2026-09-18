@@ -48,7 +48,7 @@ final readonly class PlatformSettingsReader
             throw new TenantSchemaNotReady('The Settings ownership schema is not active for this deployment.');
         }
         if ($hasOwnership) {
-            $this->installation->assertUsable('settings.values', $connection);
+            $this->installation->assertUsable('settings.values');
         } else {
             $this->installation->assertUnadopted($connection, 'settings.values');
         }

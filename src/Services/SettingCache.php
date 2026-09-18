@@ -83,7 +83,7 @@ final readonly class SettingCache
 
         $ownership = $this->boundary->attributes('settings.values')['ownership_key'] ?? 'disabled';
 
-        return $this->makeIdentity($connection->getName(), $ownership, $hashes);
+        return $this->makeIdentity($connection->getName() ?? 'default', $ownership, $hashes);
     }
 
     /** Derive a stable identity directly from a persisted row. */
@@ -95,9 +95,11 @@ final readonly class SettingCache
         );
         sort($hashes);
 
+        $rawOwnership = $setting->getRawOriginal('ownership_key');
+
         return $this->makeIdentity(
-            $setting->getConnection()->getName(),
-            (string) ($setting->getRawOriginal('ownership_key') ?: 'disabled'),
+            $setting->getConnection()->getName() ?? 'default',
+            is_string($rawOwnership) && $rawOwnership !== '' ? $rawOwnership : 'disabled',
             $hashes,
         );
     }
@@ -163,8 +165,6 @@ final readonly class SettingCache
 
         $required = [
             'id',
-            'tenant_id',
-            'ownership_key',
             'namespace',
             'scope',
             'key',
@@ -182,6 +182,9 @@ final readonly class SettingCache
             'created_at',
             'updated_at',
         ];
+        if (config('tenancy.enabled') === true) {
+            $required = [...$required, 'tenant_id', 'ownership_key'];
+        }
 
         foreach ($payload as $attributes) {
             if (! is_array($attributes)
@@ -255,9 +258,17 @@ final readonly class SettingCache
         return is_string($key) && $key !== '' ? $key : 'nvl:settings:v2';
     }
 
-    /** Build one deterministic cache key without consulting ambient context. */
+    /**
+     * Build one deterministic cache key without consulting ambient context.
+     *
+     * @param  list<string>  $definitionHashes
+     */
     private function makeIdentity(string $connection, string $ownership, array $definitionHashes): SettingCacheIdentity
     {
+        if ($ownership === 'disabled') {
+            return new SettingCacheIdentity($this->store(), $this->key());
+        }
+
         return new SettingCacheIdentity($this->store(), implode(':', [
             $this->key(),
             hash('sha256', implode('|', [$connection, $ownership, ...$definitionHashes])),

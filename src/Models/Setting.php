@@ -16,7 +16,7 @@ use Nvl\Settings\Enums\SettingType;
  *
  * @property string $id
  * @property string|null $tenant_id
- * @property string $ownership_key
+ * @property string|null $ownership_key
  * @property string $namespace
  * @property string $scope
  * @property string $key
@@ -45,7 +45,6 @@ final class Setting extends Model
         'revision' => 1,
         'definition_hash' => '',
         'has_override' => false,
-        'ownership_key' => 'platform',
     ];
 
     /**

@@ -20,9 +20,9 @@ use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Services\SettingValueValidator;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Tenancy\Contracts\TenantContext;
 use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
 use Nvl\Tenancy\Services\TenantBoundary;
-use Nvl\Tenancy\Contracts\TenantContext;
 use Nvl\Tenancy\ValueObjects\TenantJobEnvelope;
 use Spatie\LaravelData\Optional;
 
@@ -187,7 +187,7 @@ final readonly class SetSettingAction
                 $key = $setting->fullKey();
                 $revision = $setting->revision;
                 $tenantId = is_string($setting->tenant_id) ? $setting->tenant_id : null;
-                $ownershipKey = $setting->ownership_key;
+                $ownershipKey = is_string($setting->ownership_key) ? $setting->ownership_key : 'platform';
                 $context = $this->auditContext->current();
                 $event = new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
                 $connection->afterCommit(static fn () => event($event));
