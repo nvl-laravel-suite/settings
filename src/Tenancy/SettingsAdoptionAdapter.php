@@ -8,7 +8,7 @@ use Illuminate\Database\Migrations\Migrator;
 use Nvl\Settings\Models\Setting;
 use Nvl\Tenancy\Contracts\TenantAdoptionAdapter;
 use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
-use Nvl\Tenancy\Services\TenantAdoptionSupport;
+use Nvl\Tenancy\Services\TenantAdoptionBoundary;
 use Nvl\Tenancy\ValueObjects\TenantAdoptionPlan;
 use Nvl\Tenancy\ValueObjects\TenantBackfillResult;
 use Nvl\Tenancy\ValueObjects\TenantVerification;
@@ -19,7 +19,7 @@ final readonly class SettingsAdoptionAdapter implements TenantAdoptionAdapter
     /** Create the Settings adopter. */
     public function __construct(
         private Migrator $migrator,
-        private TenantAdoptionSupport $adoption,
+        private TenantAdoptionBoundary $adoption,
     ) {}
 
     /** @return list<string> */
