@@ -4,6 +4,8 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-21
+
 ### Added
 
 - Added mixed platform/tenant setting ownership, immutable opt-in definitions,
