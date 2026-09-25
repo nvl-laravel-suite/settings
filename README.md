@@ -1,12 +1,12 @@
 # NVL Settings — API and usage
 
-[← NVL Laravel Suite](../../../README.md)
+[← NVL Laravel Suite](https://github.com/nvl-laravel-suite)
 
 ## Quick reference
 
 | Item | Value |
 |---|---|
-| Installed through | `composer require nvl/laravel-suite:^2.0` |
+| Installed through | `composer require nvl/settings:^2.0` |
 | Module identifier | `nvl/settings` |
 | PHP namespace | `Nvl\Settings` |
 | Service provider | `Nvl\Settings\Providers\SettingsServiceProvider` |
@@ -29,12 +29,12 @@ key/value storage, localized content, tenant ownership, or application UI.
 
 - PHP 8.4 or newer
 - Laravel 13
-- `nvl/data` for public DTO and generated TypeScript contracts
+- `nvl/core` for public DTO and generated TypeScript contracts
 
 ## Installation
 
 ```bash
-composer require nvl/laravel-suite:^2.0
+composer require nvl/settings:^2.0
 php artisan migrate
 php artisan vendor:publish --tag=settings-config
 ```
@@ -204,7 +204,7 @@ null is valid.
 
 ## Typed Actions
 
-The public action boundary returns `nvl/data` DTOs:
+The public action boundary returns Core Data DTOs:
 
 ```php
 use Nvl\Settings\Actions\GetSettingAction;

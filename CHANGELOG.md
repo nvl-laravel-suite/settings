@@ -4,6 +4,10 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Prepare `nvl/settings` for independent Composer and Git publication; require `nvl/core` for shared Support and Data services.
+
 ## [2.0.1] - 2026-09-22
 
 ### Added
