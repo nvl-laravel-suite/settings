@@ -1,0 +1,373 @@
+{
+    "schema_version": 1,
+    "package": "nvl/settings",
+    "psr4": {
+        "Nvl\\Settings\\": "src"
+    },
+    "symbols": {
+        "Nvl\\Settings\\Actions\\GetManySettingsAction": {
+            "kind": "class",
+            "file": "src/Actions/GetManySettingsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Actions\\GetSettingAction": {
+            "kind": "class",
+            "file": "src/Actions/GetSettingAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Actions\\ListSettingsAction": {
+            "kind": "class",
+            "file": "src/Actions/ListSettingsAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Actions\\ResetSettingAction": {
+            "kind": "class",
+            "file": "src/Actions/ResetSettingAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Actions\\SetSettingAction": {
+            "kind": "class",
+            "file": "src/Actions/SetSettingAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Actions\\ValidateSettingsSourcesAction": {
+            "kind": "class",
+            "file": "src/Actions/ValidateSettingsSourcesAction.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Contracts\\SettingRepository": {
+            "kind": "interface",
+            "file": "src/Contracts/SettingRepository.php",
+            "methods": [
+                "forget",
+                "get",
+                "has",
+                "set",
+                "setMany"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Contracts\\SettingsAuditContextProvider": {
+            "kind": "interface",
+            "file": "src/Contracts/SettingsAuditContextProvider.php",
+            "methods": [
+                "current"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Contracts\\SettingsAuthorization": {
+            "kind": "interface",
+            "file": "src/Contracts/SettingsAuthorization.php",
+            "methods": [
+                "authorize"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Data\\SettingAuditContextData": {
+            "kind": "class",
+            "file": "src/Data/SettingAuditContextData.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "actorId",
+                "actorType",
+                "ipAddress",
+                "requestId",
+                "userAgent"
+            ],
+            "constants": []
+        },
+        "Nvl\\Settings\\Data\\SettingListQueryData": {
+            "kind": "class",
+            "file": "src/Data/SettingListQueryData.php",
+            "methods": [
+                "__construct",
+                "rules"
+            ],
+            "properties": [
+                "namespace",
+                "page",
+                "perPage",
+                "scope",
+                "search"
+            ],
+            "constants": []
+        },
+        "Nvl\\Settings\\Data\\SettingMutationData": {
+            "kind": "class",
+            "file": "src/Data/SettingMutationData.php",
+            "methods": [
+                "__construct",
+                "rules"
+            ],
+            "properties": [
+                "expectedRevision",
+                "key",
+                "validFrom",
+                "validUntil",
+                "value"
+            ],
+            "constants": []
+        },
+        "Nvl\\Settings\\Data\\SettingValueData": {
+            "kind": "class",
+            "file": "src/Data/SettingValueData.php",
+            "methods": [
+                "__construct",
+                "fromDefinition"
+            ],
+            "properties": [
+                "definitionHash",
+                "hasOverride",
+                "key",
+                "orphaned",
+                "revision",
+                "source",
+                "type",
+                "validFrom",
+                "validUntil",
+                "value"
+            ],
+            "constants": []
+        },
+        "Nvl\\Settings\\Data\\SettingsSourceStatusData": {
+            "kind": "class",
+            "file": "src/Data/SettingsSourceStatusData.php",
+            "methods": [
+                "__construct"
+            ],
+            "properties": [
+                "checksum",
+                "definitionCount",
+                "error",
+                "namespaces",
+                "sourceCount",
+                "sourceFiles",
+                "valid"
+            ],
+            "constants": []
+        },
+        "Nvl\\Settings\\Enums\\SettingAbility": {
+            "kind": "enum",
+            "file": "src/Enums/SettingAbility.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "List",
+                "Reset",
+                "Set",
+                "Status",
+                "View"
+            ]
+        },
+        "Nvl\\Settings\\Enums\\SettingType": {
+            "kind": "enum",
+            "file": "src/Enums/SettingType.php",
+            "methods": [
+                "baseRules",
+                "cases",
+                "deserialize",
+                "from",
+                "serialize",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Boolean",
+                "Date",
+                "DateTime",
+                "Decimal",
+                "Enum",
+                "Integer",
+                "Json",
+                "Text"
+            ]
+        },
+        "Nvl\\Settings\\Facades\\Setting": {
+            "kind": "class",
+            "file": "src/Facades/Setting.php",
+            "methods": [
+                "forget",
+                "get",
+                "has",
+                "set",
+                "setMany"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Models\\Setting": {
+            "kind": "class",
+            "file": "src/Models/Setting.php",
+            "methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Rules\\IntegerListBetween": {
+            "kind": "class",
+            "file": "src/Rules/IntegerListBetween.php",
+            "methods": [
+                "__construct",
+                "__toString",
+                "isValid",
+                "validate"
+            ],
+            "properties": [
+                "maximum",
+                "minimum"
+            ],
+            "constants": []
+        },
+        "Nvl\\Settings\\Rules\\IntegerMapBetween": {
+            "kind": "class",
+            "file": "src/Rules/IntegerMapBetween.php",
+            "methods": [
+                "__construct",
+                "__toString",
+                "isValid",
+                "validate"
+            ],
+            "properties": [
+                "maximum",
+                "minimum"
+            ],
+            "constants": []
+        },
+        "Nvl\\Settings\\Support\\Definition": {
+            "kind": "class",
+            "file": "src/Support/Definition.php",
+            "methods": [
+                "__construct",
+                "hash"
+            ],
+            "properties": [
+                "default",
+                "description",
+                "key",
+                "metadata",
+                "namespace",
+                "overrides",
+                "position",
+                "rules",
+                "scope",
+                "source",
+                "tenantOverride",
+                "type"
+            ],
+            "constants": []
+        },
+        "Nvl\\Settings\\Support\\DefinitionRepository": {
+            "kind": "class",
+            "file": "src/Support/DefinitionRepository.php",
+            "methods": [
+                "__construct",
+                "all",
+                "cachePath",
+                "checksum",
+                "fake",
+                "get",
+                "map",
+                "refresh"
+            ],
+            "properties": [],
+            "constants": [
+                "MAX_FULL_KEY_LENGTH",
+                "MAX_SEGMENT_LENGTH"
+            ]
+        },
+        "Nvl\\Settings\\Support\\SettingsRules": {
+            "kind": "class",
+            "file": "src/Support/SettingsRules.php",
+            "methods": [
+                "integerListBetween",
+                "integerListBetweenParameters",
+                "integerMapBetween",
+                "integerMapBetweenParameters"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Testing\\InteractsWithSettings": {
+            "kind": "trait",
+            "file": "src/Testing/InteractsWithSettings.php",
+            "methods": [
+                "defineSettings"
+            ],
+            "properties": [],
+            "constants": []
+        }
+    },
+    "models": {
+        "Nvl\\Settings\\Models\\Setting": {
+            "read": [],
+            "identity_methods": [
+                "getKey",
+                "getKeyName",
+                "getMorphClass",
+                "getRouteKey",
+                "getRouteKeyName",
+                "is",
+                "isNot",
+                "relationLoaded"
+            ],
+            "capability_relations": []
+        }
+    },
+    "capability_relations": {},
+    "tables": {
+        "settings": "nvl_settings_settings"
+    }
+}
