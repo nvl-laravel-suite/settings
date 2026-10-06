@@ -19,6 +19,8 @@ use TypeError;
 
 /**
  * Discovers, validates, and caches file-backed setting definitions.
+ *
+ * @api
  */
 final class DefinitionRepository
 {

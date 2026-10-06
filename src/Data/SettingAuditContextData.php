@@ -6,6 +6,8 @@ namespace Nvl\Settings\Data;
 
 /**
  * Value-free actor and request metadata attached to a setting mutation.
+ *
+ * @api
  */
 final readonly class SettingAuditContextData
 {

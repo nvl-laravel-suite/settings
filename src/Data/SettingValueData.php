@@ -13,6 +13,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Effective runtime value plus source and concurrency information.
+ *
+ * @api
  */
 #[TypeScript]
 final class SettingValueData extends Data
@@ -37,6 +39,8 @@ final class SettingValueData extends Data
 
     /**
      * Create an effective value from a persisted setting.
+     *
+     * @internal
      */
     public static function fromModel(Setting $setting): self
     {

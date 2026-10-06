@@ -13,6 +13,8 @@ use Throwable;
  * Immutable, validated metadata for one discoverable setting.
  *
  * @param  array<int, mixed>  $rules
+ *
+ * @api
  */
 final readonly class Definition
 {

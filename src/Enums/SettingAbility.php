@@ -6,6 +6,8 @@ namespace Nvl\Settings\Enums;
 
 /**
  * Authorization abilities exposed by the optional management API.
+ *
+ * @api
  */
 enum SettingAbility: string
 {

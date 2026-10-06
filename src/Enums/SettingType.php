@@ -12,6 +12,8 @@ use Throwable;
 
 /**
  * Defines the supported setting types and their canonical storage codec.
+ *
+ * @api
  */
 enum SettingType: string
 {

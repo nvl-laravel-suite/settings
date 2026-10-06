@@ -8,6 +8,8 @@ use Nvl\Settings\Enums\SettingAbility;
 
 /**
  * Consumer-owned authorization boundary for setting management.
+ *
+ * @api
  */
 interface SettingsAuthorization
 {

@@ -9,6 +9,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Validated filtering and pagination input for management setting definitions.
+ *
+ * @api
  */
 #[TypeScript]
 final class SettingListQueryData extends Data

@@ -6,6 +6,7 @@ All notable changes to `nvl/settings` are documented here.
 
 ### Changed
 
+- Classify the supported consumer PHP surface with explicit source annotations and restrict package model handles to declared identity and in-memory read fields; preserve existing workflow behavior and concrete signatures.
 - Prepare lockstep major 5 with required and development NVL peer floors of `^5.0`. This candidate has not been tagged or published.
 - Default database config overrides to off and apply explicitly enabled projection only during request/job execution.
 - Restore projected configuration at lifecycle boundaries; discovery and config caching perform no settings queries.

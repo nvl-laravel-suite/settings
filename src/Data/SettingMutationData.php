@@ -15,6 +15,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Optimistic setting mutation contract.
+ *
+ * @api
  */
 #[TypeScript]
 #[MapInputName(CamelCaseMapper::class)]

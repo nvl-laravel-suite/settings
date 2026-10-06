@@ -11,6 +11,8 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Resolves one defined setting with explicit source metadata.
+ *
+ * @api
  */
 final readonly class GetSettingAction
 {

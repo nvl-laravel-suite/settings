@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static void setMany(array<string, mixed> $values)
  * @method static void forget(string $key)
  * @method static bool has(string $key)
+ *
+ * @api
  */
 final class Setting extends Facade
 {

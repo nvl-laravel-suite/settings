@@ -6,6 +6,8 @@ namespace Nvl\Settings\Contracts;
 
 /**
  * Exposes the minimal consumer-facing settings read and mutation contract.
+ *
+ * @api
  */
 interface SettingRepository
 {

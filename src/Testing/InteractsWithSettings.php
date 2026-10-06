@@ -10,6 +10,8 @@ use Nvl\Settings\Support\DefinitionRepository;
 
 /**
  * Provides deterministic in-memory definitions for package consumers' tests.
+ *
+ * @api
  */
 trait InteractsWithSettings
 {

@@ -8,6 +8,8 @@ use Nvl\Settings\Data\SettingAuditContextData;
 
 /**
  * Supplies value-free actor and request context for setting mutation events.
+ *
+ * @api
  */
 interface SettingsAuditContextProvider
 {

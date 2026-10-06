@@ -19,6 +19,8 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Returns a deterministic, bounded management page of setting definitions and values.
+ *
+ * @api
  */
 final readonly class ListSettingsAction
 {

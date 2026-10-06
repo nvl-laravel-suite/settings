@@ -18,6 +18,8 @@ use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 
 /**
  * Clears one override while preserving its synchronized definition fallback.
+ *
+ * @api
  */
 final readonly class ResetSettingAction
 {

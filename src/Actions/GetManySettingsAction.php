@@ -13,6 +13,8 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Resolves a bounded collection of setting keys with one storage query.
+ *
+ * @api
  */
 final readonly class GetManySettingsAction
 {

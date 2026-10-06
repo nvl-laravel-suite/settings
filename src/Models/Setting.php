@@ -34,6 +34,8 @@ use Nvl\Support\Config\PackageStorage;
  * @property Carbon|null $orphaned_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
+ *
+ * @api
  */
 final class Setting extends Model
 {

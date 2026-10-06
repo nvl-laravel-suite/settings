@@ -9,6 +9,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Reports a sanitized source-discovery validation result.
+ *
+ * @api
  */
 #[TypeScript]
 final class SettingsSourceStatusData extends Data

@@ -10,6 +10,8 @@ use Nvl\Settings\Rules\IntegerMapBetween;
 
 /**
  * Builds deterministic validation rules for structured JSON settings.
+ *
+ * @api
  */
 final class SettingsRules
 {

@@ -9,6 +9,8 @@ use Nvl\Settings\Support\DefinitionRepository;
 
 /**
  * Validates configured setting sources without mutating the database.
+ *
+ * @api
  */
 final readonly class ValidateSettingsSourcesAction
 {

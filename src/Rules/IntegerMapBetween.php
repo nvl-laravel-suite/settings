@@ -11,6 +11,8 @@ use Stringable;
 
 /**
  * Validates a JSON object with safe string keys and bounded integer values.
+ *
+ * @api
  */
 final readonly class IntegerMapBetween implements Stringable, ValidationRule
 {

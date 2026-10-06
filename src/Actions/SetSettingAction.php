@@ -28,6 +28,8 @@ use Spatie\LaravelData\Optional;
 
 /**
  * Validates and persists one optimistic runtime override.
+ *
+ * @api
  */
 final readonly class SetSettingAction
 {

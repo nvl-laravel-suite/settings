@@ -11,6 +11,8 @@ use Stringable;
 
 /**
  * Validates a JSON list containing only bounded integers.
+ *
+ * @api
  */
 final readonly class IntegerListBetween implements Stringable, ValidationRule
 {
