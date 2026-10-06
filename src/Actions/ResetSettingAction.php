@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Settings\Actions;
 
 use Illuminate\Support\Facades\DB;
+use Nvl\Settings\Contracts\ResetSettingContract;
 use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Events\SettingChanged;
@@ -12,6 +13,7 @@ use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
@@ -21,7 +23,7 @@ use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
  *
  * @api
  */
-final readonly class ResetSettingAction
+final readonly class ResetSettingAction implements ResetSettingContract
 {
     /**
      * Create the optimistic reset action.
@@ -32,6 +34,7 @@ final readonly class ResetSettingAction
         private SettingsAuditContextProvider $auditContext,
         private TenantBoundary $boundary,
         private TenantContext $tenantContext,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -77,9 +80,7 @@ final readonly class ResetSettingAction
                 $ownershipKey = is_string($setting->ownership_key) ? $setting->ownership_key : 'platform';
                 $context = $this->auditContext->current();
                 $event = new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
-                $connection->afterCommit(
-                    static fn () => event($event),
-                );
+                $this->domainEvents->dispatch($event, $connection);
 
                 return $setting;
             });

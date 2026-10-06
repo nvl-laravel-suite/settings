@@ -14,6 +14,7 @@ use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Providers\SettingsServiceProvider;
 use Nvl\Settings\Services\PlatformSettingsRuntime;
 use Nvl\Settings\Tests\PlatformSettingsBootTestCase;
+use Nvl\Support\Providers\LocaleServiceProvider;
 use Nvl\Support\Providers\SupportServiceProvider;
 use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -45,16 +46,23 @@ test('native discovery and configuration cache never read enabled override stora
     $providers = [
         SettingsNativeBootDatabaseProbeProvider::class,
         SupportServiceProvider::class,
+        LocaleServiceProvider::class,
         DataServiceProvider::class,
         TenancyServiceProvider::class,
         SettingsServiceProvider::class,
     ];
     $files->put($path.'/bootstrap/app.php', '<?php return \\Illuminate\\Foundation\\Application::configure(basePath: '.var_export($path, true).')->withProviders('.var_export($providers, true).', withBootstrapProviders: false)->create();');
+    $driver = config('database.default');
+    $connection = config('database.connections.'.$driver);
+    $connection['url'] = null;
+    $connection['database'] = $unavailable
+        ? ($driver === 'sqlite' ? $path.'/missing/database.sqlite' : 'nvl_settings_missing_'.str_replace('-', '', (string) Str::uuid()))
+        : $this->databasePath;
     $configuration = [
         'app' => ['name' => 'Original platform', 'env' => 'testing', 'key' => 'base64:YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE='],
         'database' => [
-            'default' => 'sqlite',
-            'connections' => ['sqlite' => ['driver' => 'sqlite', 'database' => $unavailable ? $path.'/missing/database.sqlite' : $this->databasePath, 'prefix' => '']],
+            'default' => $driver,
+            'connections' => [$driver => $connection],
         ],
         'nvl-settings' => [
             'discovery' => ['paths' => [__DIR__.'/../Fixtures/platform-settings'], 'cache' => false],

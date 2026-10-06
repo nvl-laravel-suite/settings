@@ -6,8 +6,10 @@ namespace Nvl\Settings\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Nvl\Settings\Casts\SettingValueCast;
+use Nvl\Settings\Database\Factories\SettingFactory;
 use Nvl\Settings\Definitions\Tables\SettingsTables;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Support\Config\PackageStorage;
@@ -39,6 +41,9 @@ use Nvl\Support\Config\PackageStorage;
  */
 final class Setting extends Model
 {
+    /** @use HasFactory<SettingFactory> */
+    use HasFactory;
+
     use HasUuids;
 
     /**
@@ -161,5 +166,15 @@ final class Setting extends Model
                 $setting->revision = (is_int($revision) ? $revision : 0) + 1;
             }
         });
+    }
+
+    /**
+     * Return the package's runtime fixture factory.
+     *
+     * @internal
+     */
+    protected static function newFactory(): SettingFactory
+    {
+        return SettingFactory::new();
     }
 }

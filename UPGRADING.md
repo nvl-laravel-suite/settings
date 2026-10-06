@@ -1,5 +1,16 @@
 # Upgrading NVL Settings
 
+## Consumer contracts, committed events and runtime policy (5.x)
+
+Prefer focused public interfaces in constructor injection; native implementations remain container defaults and host prebindings win. Returned models are documented identity/data handles: use package contracts for reads/writes and capability-specific batch readers instead of direct package queries. Enable the shipped Core PHPStan include in your host; do not invoke the suite workbench static audit command in a consumer.
+
+Events now carry immutable schemaVersion=1 and scalar/DTO snapshots. Replace model-bearing event fields with the IDs listed in [events](docs/events.md); load only through an authorized public reader when needed. Only six declared legacy `*Event` names are retained as PHP aliases for major 5, removal no earlier than major 6. Migrate exact imports/listeners/fakes to canonical names, replace suffix wildcard patterns explicitly, drain old queued payloads, rebuild event caches and restart workers. Framework Verified/PasswordReset remain native classes. Source-connection callbacks are process-local after-commit publication, not a durable outbox or exactly-once delivery.
+
+Package failures have a marker and optional response metadata. Opt into Core's JSON renderer deliberately; preserve existing host handlers and request-locale selection. Missing required host adapters produce `binding_required`/500; genuine configured authorization denial retains native handling. See the README error table and required-bindings section where applicable.
+
+Factories ship in runtime package mappings for host tests. Ordinary make may persist parents; withoutParents()->make creates detached fixtures. Supply persisted native owners/parents and active tenants explicitly, retain source revisions, and never treat a factory row as a real storage/provider/workflow effect. Core's optional installer publishes common config without enabling features; strict Doctor and explicit deployment cache/worker steps belong in the host release process. C3/C4/E executable acceptance is pending until recorded by integration.
+
+
 ## Tenant adoption
 
 Install the tenancy expansion migration, prepare a reviewed assignment map,
@@ -87,3 +98,16 @@ Use source `@api` workflows, extension contracts, and value types for applicatio
 The implementation Actions `AdoptSettingsAction` are explicitly internal. Run `nvl:settings:adopt` for reviewed legacy adoption; use `GetSettingAction`, `SetSettingAction`, and `ResetSettingAction` for ordinary application settings.
 
 `SettingValueData::fromModel` is an internal storage projector. Obtain effective value DTOs through `GetSettingAction`, `GetManySettingsAction`, or the supported Settings repository; these resolve overrides and revisions within the package.
+
+## Application workflow contracts
+
+SettingRepository keeps its scoped lifetime using scopedIf. The Setting facade continues through the alias of this same contract. InteractsWithSettings retains definition-only scope.
+
+The supported workflow injection names are `GetManySettingsContract`, `GetSettingContract`, `ListSettingsContract`, `ResetSettingContract`, `SetSettingContract`, `ValidateSettingsSourcesContract`.
+
+Inject these contracts when application workflows need substitution. Native
+concrete constructors and operation signatures remain available through major 5;
+internal workflow chains are unchanged. Register host implementations before
+package discovery or replace the contract before resolving a new host service.
+See [Testing your app](README.md#testing-your-app) for native fixtures and the
+shipped consumer-audit PHPStan configuration.

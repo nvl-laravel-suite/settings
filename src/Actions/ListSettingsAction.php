@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Nvl\Data\Data\PaginatedCollection;
 use Nvl\Data\Data\PaginationMeta;
+use Nvl\Settings\Contracts\ListSettingsContract;
 use Nvl\Settings\Data\SettingDefinitionData;
 use Nvl\Settings\Data\SettingListQueryData;
 use Nvl\Settings\Data\SettingManagementData;
@@ -22,7 +23,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class ListSettingsAction
+final readonly class ListSettingsAction implements ListSettingsContract
 {
     /**
      * Create the settings management-list action.

@@ -4,20 +4,19 @@ declare(strict_types=1);
 
 namespace Nvl\Settings\Events;
 
-use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
-use Illuminate\Foundation\Events\Dispatchable;
 use Nvl\Settings\Data\SettingAuditContextData;
 use Nvl\Settings\Data\SettingSubjectReferenceData;
+use Nvl\Support\Contracts\DomainEvent;
 use Nvl\Support\Tenancy\Contracts\TenantQueuedJob;
 use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 
 /**
  * Signals a committed runtime setting mutation without serializing its value.
+ *
+ * @api
  */
-final readonly class SettingChanged implements ShouldDispatchAfterCommit, TenantQueuedJob
+final readonly class SettingChanged implements DomainEvent, TenantQueuedJob
 {
-    use Dispatchable;
-
     public SettingAuditContextData $context;
 
     public SettingSubjectReferenceData $subject;
@@ -34,6 +33,7 @@ final readonly class SettingChanged implements ShouldDispatchAfterCommit, Tenant
         public ?string $tenantId = null,
         public string $ownershipKey = 'platform',
         private ?TenantJobEnvelope $envelope = null,
+        public int $schemaVersion = 1,
     ) {
         $this->context = $context ?? new SettingAuditContextData;
         $this->subject = new SettingSubjectReferenceData($this->id);
@@ -47,5 +47,11 @@ final readonly class SettingChanged implements ShouldDispatchAfterCommit, Tenant
         }
 
         return $this->envelope;
+    }
+
+    /** Return the immutable event payload schema version. */
+    public function schemaVersion(): int
+    {
+        return $this->schemaVersion;
     }
 }

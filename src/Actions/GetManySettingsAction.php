@@ -6,6 +6,7 @@ namespace Nvl\Settings\Actions;
 
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
+use Nvl\Settings\Contracts\GetManySettingsContract;
 use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
@@ -16,7 +17,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class GetManySettingsAction
+final readonly class GetManySettingsAction implements GetManySettingsContract
 {
     /**
      * Create the bulk settings read action.

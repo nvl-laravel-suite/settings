@@ -1,0 +1,359 @@
+{
+  "schema_version": 1,
+  "package": "nvl/settings",
+  "documentation": "docs/events.md",
+  "implementation_status": "implemented; executable acceptance proof pending",
+  "events": [
+    {
+      "class": "Nvl\\Settings\\Events\\SettingChanged",
+      "source": "packages/nvl/settings/src/Events/SettingChanged.php",
+      "constructor_fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "key",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "revision",
+          "type": "int",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "context",
+          "type": "?Nvl\\Settings\\Data\\SettingAuditContextData",
+          "visibility": "parameter",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "tenantId",
+          "type": "?string",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "ownershipKey",
+          "type": "string",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "'platform'"
+        },
+        {
+          "name": "envelope",
+          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantJobEnvelope",
+          "visibility": "private",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "revision",
+          "type": "int"
+        },
+        {
+          "name": "operation",
+          "type": "string"
+        },
+        {
+          "name": "context",
+          "type": "Nvl\\Settings\\Data\\SettingAuditContextData"
+        },
+        {
+          "name": "tenantId",
+          "type": "?string"
+        },
+        {
+          "name": "ownershipKey",
+          "type": "string"
+        },
+        {
+          "name": "schemaVersion",
+          "type": "int"
+        },
+        {
+          "name": "subject",
+          "type": "Nvl\\Settings\\Data\\SettingSubjectReferenceData"
+        }
+      ],
+      "kind": "value_object",
+      "schema_version": 1,
+      "trigger": "Value-free runtime setting mutation.",
+      "aliases": [],
+      "producers": [
+        {
+          "path": "packages/nvl/settings/src/Actions/ResetSettingAction.php",
+          "trigger": "Value-free runtime setting mutation.",
+          "connection": "$connection = DB::connection($model->getConnectionName())",
+          "construction_expression": "new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext))"
+        },
+        {
+          "path": "packages/nvl/settings/src/Actions/SetSettingAction.php",
+          "trigger": "Value-free runtime setting mutation.",
+          "connection": "$connection = DB::connection($model->getConnectionName())",
+          "construction_expression": "new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext))"
+        },
+        {
+          "path": "packages/nvl/settings/src/SettingManager.php",
+          "trigger": "Value-free runtime setting mutation.",
+          "connection": "$connection = DB::connection((new Setting)->getConnectionName())",
+          "construction_expression": "new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext))"
+        },
+        {
+          "path": "packages/nvl/settings/src/SettingManager.php",
+          "trigger": "Value-free runtime setting mutation.",
+          "connection": "$connection = DB::connection((new Setting)->getConnectionName())",
+          "construction_expression": "new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext))"
+        }
+      ],
+      "security_notes": [
+        "Value-free setting ID/key/revision and persisted tenant/ownership identity; context can carry actor ID, request ID, IP address and user agent. Treat request metadata as private. subject is the scalar nvl_setting reference. Private captured TenantJobEnvelope is available through tenantJobEnvelope(); it contains no model."
+      ],
+      "no_op_semantics": "Unchanged writes and absent resets emit nothing. Set/reset facts capture ownership and request context before commit; never resolve tenant context later."
+    }
+  ],
+  "value_types": [
+    {
+      "class": "Nvl\\Settings\\Data\\SettingAuditContextData",
+      "source": "packages/nvl/settings/src/Data/SettingAuditContextData.php",
+      "constructor_fields": [
+        {
+          "name": "actorType",
+          "type": "?string",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "actorId",
+          "type": "?string",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "requestId",
+          "type": "?string",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "ipAddress",
+          "type": "?string",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        },
+        {
+          "name": "userAgent",
+          "type": "?string",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "actorType",
+          "type": "?string"
+        },
+        {
+          "name": "actorId",
+          "type": "?string"
+        },
+        {
+          "name": "requestId",
+          "type": "?string"
+        },
+        {
+          "name": "ipAddress",
+          "type": "?string"
+        },
+        {
+          "name": "userAgent",
+          "type": "?string"
+        }
+      ],
+      "kind": "value_object"
+    },
+    {
+      "class": "Nvl\\Settings\\Data\\SettingSubjectReferenceData",
+      "source": "packages/nvl/settings/src/Data/SettingSubjectReferenceData.php",
+      "constructor_fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "visibility": "public",
+          "required": true
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "type": "string"
+        }
+      ],
+      "kind": "value_object",
+      "constants": {
+        "type": "nvl_setting"
+      }
+    },
+    {
+      "class": "Nvl\\Support\\Tenancy\\Enums\\TenantContextMode",
+      "source": "packages/nvl/core/support/src/Tenancy/Enums/TenantContextMode.php",
+      "constructor_fields": [],
+      "public_fields": [],
+      "kind": "enum",
+      "backing_type": "string",
+      "cases": [
+        {
+          "name": "Disabled",
+          "value": "disabled"
+        },
+        {
+          "name": "Unresolved",
+          "value": "unresolved"
+        },
+        {
+          "name": "Tenant",
+          "value": "tenant"
+        },
+        {
+          "name": "Platform",
+          "value": "platform"
+        }
+      ]
+    },
+    {
+      "class": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantContextSnapshot",
+      "source": "packages/nvl/core/support/src/Tenancy/ValueObjects/TenantContextSnapshot.php",
+      "constructor_fields": [
+        {
+          "name": "mode",
+          "type": "Nvl\\Support\\Tenancy\\Enums\\TenantContextMode",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "tenantId",
+          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantId",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "null"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "mode",
+          "type": "Nvl\\Support\\Tenancy\\Enums\\TenantContextMode"
+        },
+        {
+          "name": "tenantId",
+          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantId"
+        }
+      ],
+      "kind": "value_object"
+    },
+    {
+      "class": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantId",
+      "source": "packages/nvl/core/support/src/Tenancy/ValueObjects/TenantId.php",
+      "constructor_fields": [
+        {
+          "name": "value",
+          "type": "string",
+          "visibility": "parameter",
+          "required": true
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "kind": "value_object"
+    },
+    {
+      "class": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantJobEnvelope",
+      "source": "packages/nvl/core/support/src/Tenancy/ValueObjects/TenantJobEnvelope.php",
+      "constructor_fields": [
+        {
+          "name": "context",
+          "type": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantContextSnapshot",
+          "visibility": "public",
+          "required": true
+        },
+        {
+          "name": "version",
+          "type": "int",
+          "visibility": "public",
+          "required": false,
+          "default_expression": "1"
+        }
+      ],
+      "public_fields": [
+        {
+          "name": "context",
+          "type": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantContextSnapshot"
+        },
+        {
+          "name": "version",
+          "type": "int"
+        }
+      ],
+      "kind": "value_object"
+    }
+  ],
+  "aliases": [],
+  "publication": {
+    "publication": "The native host dispatcher receives the captured event after the supplied source connection outer commit, or immediately when that connection has no active transaction.",
+    "rollback": "Callbacks attach to the matching native connection and current nesting record; native outer/savepoint rollback discards the corresponding callbacks.",
+    "registration_failure": "Missing source transaction records fail before commit; Mail Notifications reports and drops unusable observations.",
+    "host_policy": "Host after-commit listeners and queue after_commit policies can add their own deferral after publication. Host transaction infrastructure and dispatcher bindings are preserved.",
+    "delivery_limit": "Local callbacks are not an outbox. Process exit between commit and callback can lose delivery; no crash durability or exactly-once delivery is promised.",
+    "cardinality": "One canonical object is dispatched per qualifying producer call. This is local publication, not cross-process deduplication or a guarantee that repeated observations are unique.",
+    "manual_producers": "Use Nvl\\Support\\Events\\DomainEventDispatcher::dispatch($event, $writerConnection). Native Event::dispatch() is immediate and has no package interception."
+  },
+  "security_notes": [
+    "Value-free setting ID/key/revision and persisted tenant/ownership identity; context can carry actor ID, request ID, IP address and user agent. Treat request metadata as private. subject is the scalar nvl_setting reference. Private captured TenantJobEnvelope is available through tenantJobEnvelope(); it contains no model."
+  ],
+  "no_op_semantics": "Unchanged writes and absent resets emit nothing. Set/reset facts capture ownership and request context before commit; never resolve tenant context later.",
+  "notes": [
+    "The context constructor parameter is nullable; the public context property is a non-null SettingAuditContextData defaulted during construction. subject is computed as SettingSubjectReferenceData(id), whose type is always nvl_setting. The private envelope default null supports construction compatibility; tenantJobEnvelope() requires a captured envelope."
+  ]
+}

@@ -8,6 +8,8 @@ use Illuminate\Contracts\Debug\ShouldntReport;
 use Throwable;
 
 /**
+ * @api
+
  * Raised when a setting mutation targets an outdated revision.
  */
 final class StaleSettingVersionException extends SettingException implements ShouldntReport

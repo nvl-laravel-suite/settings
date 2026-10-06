@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Nvl\Settings\Contracts\SetSettingContract;
 use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Data\SettingMutationData;
 use Nvl\Settings\Data\SettingValueData;
@@ -20,6 +21,7 @@ use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Services\SettingValueValidator;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
@@ -31,7 +33,7 @@ use Spatie\LaravelData\Optional;
  *
  * @api
  */
-final readonly class SetSettingAction
+final readonly class SetSettingAction implements SetSettingContract
 {
     /**
      * Create the optimistic setting mutation action.
@@ -43,6 +45,7 @@ final readonly class SetSettingAction
         private SettingsAuditContextProvider $auditContext,
         private TenantBoundary $boundary,
         private TenantContext $tenantContext,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -192,7 +195,7 @@ final readonly class SetSettingAction
                 $ownershipKey = is_string($setting->ownership_key) ? $setting->ownership_key : 'platform';
                 $context = $this->auditContext->current();
                 $event = new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
-                $connection->afterCommit(static fn () => event($event));
+                $this->domainEvents->dispatch($event, $connection);
             }
 
             return $setting;

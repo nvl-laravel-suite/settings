@@ -14,6 +14,12 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
+use Nvl\Settings\Actions\GetManySettingsAction;
+use Nvl\Settings\Actions\GetSettingAction;
+use Nvl\Settings\Actions\ListSettingsAction;
+use Nvl\Settings\Actions\ResetSettingAction;
+use Nvl\Settings\Actions\SetSettingAction;
+use Nvl\Settings\Actions\ValidateSettingsSourcesAction;
 use Nvl\Settings\Adapters\Laravel\LaravelSettingsAuditContextProvider;
 use Nvl\Settings\Commands\AdoptCommand;
 use Nvl\Settings\Commands\CacheCommand;
@@ -23,9 +29,15 @@ use Nvl\Settings\Commands\ListCommand;
 use Nvl\Settings\Commands\ResetCommand;
 use Nvl\Settings\Commands\SyncCommand;
 use Nvl\Settings\Commands\ValidateCommand;
+use Nvl\Settings\Contracts\GetManySettingsContract;
+use Nvl\Settings\Contracts\GetSettingContract;
+use Nvl\Settings\Contracts\ListSettingsContract;
+use Nvl\Settings\Contracts\ResetSettingContract;
+use Nvl\Settings\Contracts\SetSettingContract;
 use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Contracts\SettingsAuthorization;
+use Nvl\Settings\Contracts\ValidateSettingsSourcesContract;
 use Nvl\Settings\Http\Middleware\ApplyPlatformSettingsOverrides;
 use Nvl\Settings\Models\Setting as SettingModel;
 use Nvl\Settings\Observers\SettingCacheObserver;
@@ -63,6 +75,13 @@ final class SettingsServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bindIf(GetManySettingsContract::class, GetManySettingsAction::class);
+        $this->app->bindIf(GetSettingContract::class, GetSettingAction::class);
+        $this->app->bindIf(ListSettingsContract::class, ListSettingsAction::class);
+        $this->app->bindIf(ResetSettingContract::class, ResetSettingAction::class);
+        $this->app->bindIf(SetSettingContract::class, SetSettingAction::class);
+        $this->app->bindIf(ValidateSettingsSourcesContract::class, ValidateSettingsSourcesAction::class);
+
         PackageDoctorContributor::register($this->app, 'nvl/settings', fn (): array => $this->app->make(SettingsDoctor::class)->inspect());
 
         $this->app->register(TenantServiceProvider::class);
@@ -81,7 +100,7 @@ final class SettingsServiceProvider extends ServiceProvider
         $this->app->scoped(PlatformSettingsRuntime::class);
         $this->app->scoped(PlatformSettingsBootstrap::class);
         $this->app->scoped(ConfigOverrideApplier::class);
-        $this->app->scoped(SettingRepository::class, SettingManager::class);
+        $this->app->scopedIf(SettingRepository::class, SettingManager::class);
         $names = $this->app->make(GlobalNames::class);
         $exists = fn (string $name): bool => $this->app->bound($name);
         $install = fn (string $name) => $this->app->alias(SettingRepository::class, $name);
@@ -99,6 +118,10 @@ final class SettingsServiceProvider extends ServiceProvider
      */
     public function boot(TypeScriptSourceRegistry $typeScriptSources): void
     {
+        $this->app->make(GlobalNames::class)->translations('settings', __DIR__.'/../../lang', $this->app->make('translation.loader'));
+        $this->publishes([
+            __DIR__.'/../../lang' => lang_path('vendor/nvl-settings'),
+        ], 'nvl-settings-translations');
         $typeScriptSources->register(__DIR__.'/..', 'nvl/settings');
         $this->publishes([
             __DIR__.'/../../config/nvl-settings.php' => config_path('nvl-settings.php'),

@@ -11,6 +11,8 @@ use Spatie\TypeScriptTransformer\Attributes\TypeScript;
 
 /**
  * Stable value-free identity for a changed setting.
+ *
+ * @api
  */
 #[TypeScript]
 final class SettingSubjectReferenceData extends Data

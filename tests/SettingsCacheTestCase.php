@@ -7,6 +7,7 @@ namespace Nvl\Settings\Tests;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Settings\Providers\SettingsServiceProvider;
+use Nvl\Support\Providers\LocaleServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 /**
@@ -23,7 +24,8 @@ abstract class SettingsCacheTestCase extends Orchestra
      */
     protected function getPackageProviders($app): array
     {
-        return [DataServiceProvider::class, SettingsServiceProvider::class];
+        return [
+            LocaleServiceProvider::class, DataServiceProvider::class, SettingsServiceProvider::class];
     }
 
     /**

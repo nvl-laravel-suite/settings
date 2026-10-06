@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Settings\Actions;
 
+use Nvl\Settings\Contracts\ValidateSettingsSourcesContract;
 use Nvl\Settings\Data\SettingsSourceStatusData;
 use Nvl\Settings\Support\DefinitionRepository;
 
@@ -12,7 +13,7 @@ use Nvl\Settings\Support\DefinitionRepository;
  *
  * @api
  */
-final readonly class ValidateSettingsSourcesAction
+final readonly class ValidateSettingsSourcesAction implements ValidateSettingsSourcesContract
 {
     /**
      * Create the source-validation action.

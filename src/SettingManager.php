@@ -15,6 +15,7 @@ use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Services\SettingValueValidator;
 use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Support\Events\DomainEventDispatcher;
 use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
@@ -34,6 +35,7 @@ final class SettingManager implements SettingRepository
         private readonly SettingsAuditContextProvider $auditContext,
         private readonly TenantBoundary $boundary,
         private readonly TenantContext $tenantContext,
+        private DomainEventDispatcher $domainEvents,
     ) {}
 
     /**
@@ -179,7 +181,7 @@ final class SettingManager implements SettingRepository
                     $ownershipKey = is_string($setting->ownership_key) ? $setting->ownership_key : 'platform';
                     $context = $this->auditContext->current();
                     $event = new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
-                    $connection->afterCommit(static fn () => event($event));
+                    $this->domainEvents->dispatch($event, $connection);
                 }
             }
 
@@ -221,7 +223,7 @@ final class SettingManager implements SettingRepository
             $tenantId = is_string($setting->tenant_id) ? $setting->tenant_id : null;
             $ownershipKey = is_string($setting->ownership_key) ? $setting->ownership_key : 'platform';
             $event = new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
-            $connection->afterCommit(static fn () => event($event));
+            $this->domainEvents->dispatch($event, $connection);
         });
     }
 

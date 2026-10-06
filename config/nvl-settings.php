@@ -5,11 +5,11 @@ declare(strict_types=1);
 use Nvl\Settings\Definitions\Tables\SettingsTables;
 use Nvl\Support\Config\PackageEnvironment;
 
+/** Complete runtime defaults; publication sections are declared in ../resources/config/sections.json. */
 return [
     'discovery' => [
         'paths' => [
             base_path('settings'),
-            base_path('packages/nvl/*/settings'),
         ],
         'patterns' => [
             '*.settings.php',

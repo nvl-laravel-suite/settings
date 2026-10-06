@@ -100,7 +100,9 @@ test('enabled runtime rejects a partial settings ownership schema after a safe p
 test('enabled provider boot succeeds without storage and runtime propagates the connection failure', function (): void {
     $availableDatabasePath = $this->databasePath;
     $this->enableBootstrap = true;
-    $this->databasePath = sys_get_temp_dir().'/settings-boot-missing-'.Str::uuid().'/database.sqlite';
+    $this->databasePath = config('database.default') === 'sqlite'
+        ? sys_get_temp_dir().'/settings-boot-missing-'.Str::uuid().'/database.sqlite'
+        : 'nvl_settings_missing_'.str_replace('-', '', (string) Str::uuid());
 
     try {
         $this->refreshApplication();

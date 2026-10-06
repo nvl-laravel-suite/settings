@@ -1,0 +1,38 @@
+{
+    "schema_version": 1,
+    "configs": {
+        "nvl-settings": {
+            "required": [],
+            "common": [
+                "cache.enabled",
+                "cache.store",
+                "discovery.cache",
+                "discovery.cache_path",
+                "discovery.follow_links",
+                "discovery.paths",
+                "discovery.patterns",
+                "discovery.recursive",
+                "management.authorization_ability",
+                "management.enabled",
+                "management.middleware",
+                "management.name",
+                "management.path",
+                "migrations.enabled",
+                "overrides.enabled",
+                "storage.connection",
+                "storage.table"
+            ],
+            "advanced": [
+                "adoption.maximum_manifest_bytes",
+                "adoption.maximum_records",
+                "cache.key",
+                "discovery.maximum_file_bytes",
+                "discovery.maximum_files",
+                "discovery.maximum_json_depth",
+                "overrides.denied",
+                "sync.prune",
+                "sync.respect_db_values"
+            ]
+        }
+    }
+}

@@ -1,11 +1,19 @@
 # Changelog
 
+## Unreleased — consumer runtime integration
+
+- Added focused consumer contract/testing guidance and shipped-factory usage limits.
+- Versioned committed event payloads and documented canonical aliases, source connections, failure metadata and optional safe rendering.
+- Added explicit first-use/installer and deployment guidance; new acceptance checks remain pending.
+
+
 All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
 ### Changed
 
+- SettingRepository keeps its scoped lifetime using scopedIf. The Setting facade continues through the alias of this same contract. InteractsWithSettings retains definition-only scope. Document contract substitution and truthful host fixtures in Testing your app.
 - Classify the supported consumer PHP surface with explicit source annotations and restrict package model handles to declared identity and in-memory read fields; preserve existing workflow behavior and concrete signatures.
 - Prepare lockstep major 5 with required and development NVL peer floors of `^5.0`. This candidate has not been tagged or published.
 - Default database config overrides to off and apply explicitly enabled projection only during request/job execution.

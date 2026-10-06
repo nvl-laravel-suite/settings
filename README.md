@@ -1,5 +1,28 @@
 # NVL Settings — API and usage
 
+## Quickstart
+
+```sh
+composer require nvl/settings:^5.0
+php artisan nvl:install settings --dry-run
+php artisan nvl:install settings
+```
+
+Required NVL dependencies: `nvl/core` (`^5.0`). Register the site.title definition in a configured host Settings source before this call. Definition discovery paths are host-selected; no arbitrary filesystem scan is required.
+Review the published common config, select one migration owner, and run schema preflight before existing-table upgrades. The installer does not enable features or run migrations. Follow the detailed installation and capability sections below before invoking a storage/provider operation.
+
+Inject `Nvl\Settings\Contracts\GetSettingContract` in a host service. After supplying the trusted inputs described above, the first public call is:
+
+```php
+use Nvl\Settings\Contracts\GetSettingContract;
+
+/** @var GetSettingContract $capability */
+$result = $capability->execute('site.title');
+```
+
+Use the [event catalog](docs/events.md) and [Testing your app](#testing-your-app) below. The suite [getting-started guide](https://github.com/nvl-laravel-suite/laravel-suite/blob/main/docs/getting-started.md) provides a complete Comments host fixture; package archives retain their own local references.
+
+
 [← NVL Laravel Suite](https://github.com/nvl-laravel-suite)
 
 For support, [open an issue](https://github.com/nvl-laravel-suite/settings/issues). For vulnerabilities, use
@@ -41,6 +64,7 @@ key/value storage, localized content, tenant ownership, or application UI.
 ```bash
 composer require nvl/settings:^5.0
 php artisan migrate
+php artisan vendor:publish --tag=nvl-settings-translations
 php artisan vendor:publish --tag=nvl-settings-config
 ```
 
@@ -212,13 +236,13 @@ null is valid.
 The public action boundary returns Core Data DTOs:
 
 ```php
-use Nvl\Settings\Actions\GetSettingAction;
-use Nvl\Settings\Actions\SetSettingAction;
+use Nvl\Settings\Contracts\GetSettingContract;
+use Nvl\Settings\Contracts\SetSettingContract;
 use Nvl\Settings\Data\SettingMutationData;
 
-$current = app(GetSettingAction::class)->execute('interface.theme');
+$current = app(GetSettingContract::class)->execute('interface.theme');
 
-$updated = app(SetSettingAction::class)->execute(
+$updated = app(SetSettingContract::class)->execute(
     SettingMutationData::validateAndCreate([
         'key' => 'interface.theme',
         'value' => 'dark',
@@ -537,9 +561,67 @@ The source `@api` declarations identify supported workflows, extension contracts
 
 A package model returned or accepted by a public workflow is an identity/result handle. Use its declared type and `getKey()`, `getKeyName()`, `getMorphClass()`, `getRouteKey()`, `getRouteKeyName()`, `is()`, `isNot()`, and `relationLoaded()`. Read only explicitly declared in-memory `@nvl-consumer-read` fields; ordinary model PHPDocs and fillable attributes do not grant consumer reads. Obtain display projections through public reads. Persistence, additional model queries, relation access/loading, and generic model serialization are outside this contract. Host-model queries remain available, while traversal or aggregates of package capability relations require the package public reader or authorized adapter.
 
-## License
+## Testing your app
 
-Released under the [MIT License](LICENSE).
+Inject `GetSettingContract`, `GetManySettingsContract`, `SetSettingContract`,
+`ResetSettingContract`, `ListSettingsContract`, or `ValidateSettingsSourcesContract`
+for focused workflows. Reuse `SettingRepository` for repository access; the
+`Setting` facade's existing container alias targets that same contract and
+retains its scoped lifetime. Clear its resolved facade cache when replacing a
+repository after first facade use.
+
+```php
+use Nvl\Settings\Contracts\GetSettingContract;
+use Nvl\Settings\Data\SettingValueData;
+use Nvl\Settings\Enums\SettingType;
+
+final readonly class ReadFeatureFlag
+{
+    public function __construct(private GetSettingContract $settings) {}
+
+    public function enabled(): bool
+    {
+        return $this->settings->execute('app.features.enabled')->value === true;
+    }
+}
+
+$value = new SettingValueData(
+    key: 'app.features.enabled', value: true, source: 'definition',
+    type: SettingType::Boolean, revision: 0, definitionHash: 'fixture',
+    hasOverride: false, orphaned: false,
+);
+$settings = Mockery::mock(GetSettingContract::class);
+$settings->shouldReceive('execute')->once()->with('app.features.enabled')->andReturn($value);
+$this->app->instance(GetSettingContract::class, $settings);
+expect($this->app->make(ReadFeatureFlag::class)->enabled())->toBeTrue();
+```
+
+Construct definition/effective-value DTO fixtures directly. For a model result
+handle use `new Nvl\Settings\Models\Setting` without writing it; use real package
+workflows on the configured schema when testing persistence, cache invalidation,
+and optimistic revisions. `InteractsWithSettings` remains the definition helper
+for discovering application declarations, not a persistence substitute.
+Mock repository calls in host orchestration tests and test the real scoped
+repository separately across request/job lifecycle resets.
+
+In Laravel application tests, register a native Mockery interface mock or a small
+implementation with `$this->app->instance(Contract::class, $substitute)` before
+resolving your application service. A host binding installed before package
+registration is retained; later contract replacements affect subsequent
+resolutions. Rebuild previously resolved host services after replacing their
+dependencies. Concrete implementations remain callable with their original
+constructors through major 5. Mocks exercise your application orchestration;
+package authorization, persistence, and external effects need real integration
+tests.
+
+SettingRepository keeps its scoped lifetime using scopedIf. The Setting facade continues through the alias of this same contract. InteractsWithSettings retains definition-only scope.
+
+For static consumer checks, include the shipped
+[`consumer-audit.neon`](https://github.com/nvl-laravel-suite/core/blob/main/support/consumer-audit.neon) from
+`vendor/nvl/core/support/consumer-audit.neon` in your host PHPStan configuration
+and configure explicit `nvlConsumer.testPaths` for factory-backed tests. The
+extension checks supported APIs and model/query boundaries; it does not prove
+authorization or arbitrary dynamic SQL.
 
 ## Shared consumer diagnostics
 
@@ -558,3 +640,69 @@ Migration filenames contain `nvl_settings_`. Existing installations must complet
 ## Canonical configuration ownership
 
 Use `nvl-settings` settings in `config/nvl-settings.php` and canonical package environment names. Old generic roots are foreign unless an upgrading NVL host explicitly selects them in Core's default-off compatibility. Canonical false/null/empty values win; no old roots are populated or written back. Keep logical package/resource IDs unchanged. Review [Core's rename inventory and cache/worker cutover](https://github.com/nvl-laravel-suite/core/blob/main/UPGRADING.md#major-5-canonical-configuration-and-environment).
+
+## Testing your app
+
+Inject the supported contract rather than constructing its concrete Action or querying package tables. Replace `Nvl\Settings\Contracts\GetSettingContract` in Laravel's native container for a host-workflow test:
+
+```php
+use Nvl\Settings\Contracts\GetSettingContract;
+
+$double = Mockery::mock(GetSettingContract::class);
+$this->app->instance(GetSettingContract::class, $double);
+// Configure the exact execute arguments and documented return value for your host case.
+```
+
+The package's conditional native binding preserves host substitutions. Production uses the real contract; test doubles do not prove its storage/authorization behavior.
+
+A detached fixture for a returned identity/data handle is:
+
+```php
+use Nvl\Settings\Models\Setting;
+$fixture = Setting::factory()->withoutParents()->make();
+```
+
+Ordinary `make()` may persist declared package parents. `withoutParents()->make()` disables parent expansion/admission for detached fixtures; use explicit persisted parents/owners and matching effective connections for a real `create()`. Factories do not authorize workflows, call Stripe, create backing Media objects or publish Template artifacts. Enabled tenancy requires explicit admitted persisted tenants/parents. Your host test installation supplies Faker; no test runner is a runtime package dependency.
+
+The shipped `Nvl\Settings\Testing\InteractsWithSettings` helper is definition-only. It registers test definitions; it does not replace persistence, caches, transactions or tenant admission.
+
+Use Laravel `Event::fake()`, `Queue::fake()`, `Mail::fake()` or `Storage::fake()` only for the effects the host test intends to isolate. Use real commits/listeners for timing proof. Add the optional Core consumer boundary rules to host PHPStan:
+
+```neon
+includes:
+    - vendor/nvl/core/support/consumer-audit.neon
+parameters:
+    nvlConsumer:
+        testPaths: [tests]
+        tableNames: []
+        exceptions: []
+```
+
+Rules read installed public metadata without suite boot. They flag internal symbols, package model queries/writes, capability relations and owned tables; they cannot prove dynamic code or runtime authorization. Exact exceptions require `file`, `identifier`, `symbol`, and a documented `reason`. New C3/C4/E tests, archives and guide execution remain pending until the integration phase records results.
+
+### Shipped factory states
+
+These runtime builders keep Laravel's native Factory API. The listed methods name explicit supported parent/owner/lifecycle states; follow each factory's native admission requirements. Detached examples above do not assert persistence validity.
+
+| Factory | Explicit states |
+| --- | --- |
+| [`SettingFactory`](database/factories/SettingFactory.php) | Native Factory states only |
+
+## Error codes and events
+
+All recognized package failures implement `Nvl\Support\Contracts\PackageException`; only `RespondableException` opts into safe response metadata. Keep native PHP programmer errors and Laravel/SDK exceptions distinct. The optional `PackageExceptionRenderer` is registered by the host in `withExceptions`; it leaves unrelated, marker-only and non-JSON handling to the host. Its JSON envelope is `{message:string, code:string, context:object}`. Request locale is host-owned; diagnostics/previous exceptions are not public copy. Event schemas and source connections are documented in [events](docs/events.md).
+
+The table lists enum discriminators, including any successful codes retained for compatibility. A code is not itself an HTTP status; the throwing exception's `suggestedStatus()` is authoritative, especially legacy/custom constructors. Empty context renders as `{}`; only documented JSON-safe context is presented.
+
+| Code | Suggested status | Public context | Translation key |
+| --- | --- | --- | --- |
+| `operation_failed` | Exception-defined; see `suggestedStatus()` | Declared safe scalar/array map; otherwise `{}` | `nvl-settings::responsecode.operation_failed` |
+| `stale_setting_version` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-settings::responsecode.stale_setting_version` |
+| `unknown_setting` | 404 | Declared safe scalar/array map; otherwise `{}` | `nvl-settings::responsecode.unknown_setting` |
+| `duplicate_setting` | 409 | Declared safe scalar/array map; otherwise `{}` | `nvl-settings::responsecode.duplicate_setting` |
+| `invalid_definition` | 500 | Declared safe scalar/array map; otherwise `{}` | `nvl-settings::responsecode.invalid_definition` |
+
+
+## License
+
+Released under the [MIT License](LICENSE).

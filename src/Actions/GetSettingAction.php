@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nvl\Settings\Actions;
 
+use Nvl\Settings\Contracts\GetSettingContract;
 use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
@@ -14,7 +15,7 @@ use Nvl\Support\Tenancy\Contracts\TenantBoundary;
  *
  * @api
  */
-final readonly class GetSettingAction
+final readonly class GetSettingAction implements GetSettingContract
 {
     /**
      * Create the single-setting read action.

@@ -7,13 +7,14 @@ namespace Nvl\Settings\Tests;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Settings\Providers\SettingsServiceProvider;
+use Nvl\Support\Providers\LocaleServiceProvider;
 use Nvl\Support\Providers\SupportServiceProvider;
 use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use RuntimeException;
 
 /**
- * Reboots the real Settings provider against one persistent SQLite platform store.
+ * Reboots the real Settings provider against one persistent configured platform store.
  */
 abstract class PlatformSettingsBootTestCase extends Orchestra
 {
@@ -32,6 +33,13 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
      */
     protected function setUp(): void
     {
+        if (getenv('NVL_FULL_DATABASE') === '1' && getenv('DB_CONNECTION') !== 'sqlite') {
+            $this->databasePath = getenv('DB_DATABASE') ?: 'testing';
+            parent::setUp();
+
+            return;
+        }
+
         $path = tempnam(sys_get_temp_dir(), 'settings-boot-');
         if ($path === false) {
             throw new RuntimeException('Unable to create the Settings boot database.');
@@ -50,7 +58,7 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
     {
         try {
             if (isset($this->app)) {
-                $this->app->make('db')->purge('sqlite');
+                $this->app->make('db')->purge($this->app['config']->get('database.default'));
             }
 
             parent::tearDown();
@@ -69,6 +77,7 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
+            LocaleServiceProvider::class,
             SupportServiceProvider::class,
             DataServiceProvider::class,
             TenancyServiceProvider::class,
@@ -81,9 +90,12 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
      */
     protected function defineEnvironment($app): void
     {
+        $driver = getenv('NVL_FULL_DATABASE') === '1' ? (getenv('DB_CONNECTION') ?: 'sqlite') : 'sqlite';
+
         $app['config']->set([
-            'database.default' => 'sqlite',
-            'database.connections.sqlite.database' => $this->databasePath,
+            'database.default' => $driver,
+            'database.connections.'.$driver.'.database' => $this->databasePath,
+            'database.connections.'.$driver.'.url' => null,
             'app.name' => 'Original platform',
             'nvl-settings.discovery.paths' => [__DIR__.'/Fixtures/platform-settings'],
             'nvl-settings.discovery.cache' => false,
