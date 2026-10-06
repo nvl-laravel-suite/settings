@@ -34,7 +34,7 @@ final readonly class PlatformSettingsBootstrap
             throw new TenantBoundaryViolation('Platform configuration bootstrap has ended.');
         }
 
-        if (! (bool) config('settings.overrides.enabled', false)
+        if (! (bool) config('nvl-settings.overrides.enabled', false)
             || ! $this->settings->available()) {
             return;
         }

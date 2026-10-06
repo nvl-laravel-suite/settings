@@ -63,7 +63,7 @@ final class DefinitionRepository
      */
     public function map(): array
     {
-        if (config('settings.discovery.cache') && file_exists($path = $this->cachePath())) {
+        if (config('nvl-settings.discovery.cache') && file_exists($path = $this->cachePath())) {
             $cached = require $path;
 
             if (! is_array($cached)) {
@@ -317,9 +317,9 @@ final class DefinitionRepository
     protected function discover(): array
     {
         $map = [];
-        $configuredPaths = config('settings.discovery.paths', []);
+        $configuredPaths = config('nvl-settings.discovery.paths', []);
         $paths = is_array($configuredPaths) ? $configuredPaths : [];
-        $configuredPatterns = config('settings.discovery.patterns', [
+        $configuredPatterns = config('nvl-settings.discovery.patterns', [
             '*.settings.php',
             '*.settings.json',
         ]);
@@ -332,9 +332,9 @@ final class DefinitionRepository
         $patterns = $patterns !== []
             ? $patterns
             : ['*.settings.php', '*.settings.json'];
-        $recursive = (bool) config('settings.discovery.recursive', true);
-        $followLinks = (bool) config('settings.discovery.follow_links', false);
-        $maximumFiles = config('settings.discovery.maximum_files', 1_000);
+        $recursive = (bool) config('nvl-settings.discovery.recursive', true);
+        $followLinks = (bool) config('nvl-settings.discovery.follow_links', false);
+        $maximumFiles = config('nvl-settings.discovery.maximum_files', 1_000);
         $maximumFiles = is_int($maximumFiles) && $maximumFiles > 0 ? $maximumFiles : 1_000;
         sort($paths);
         $count = 0;
@@ -422,7 +422,7 @@ final class DefinitionRepository
      */
     public function cachePath(): string
     {
-        $configured = config('settings.discovery.cache_path');
+        $configured = config('nvl-settings.discovery.cache_path');
 
         if ($configured === null) {
             $configured = $this->application->bootstrapPath('cache/nvl-settings.php');

@@ -28,7 +28,7 @@ final class DefinitionFileLoader
             );
         }
 
-        $maximumBytes = config('settings.discovery.maximum_file_bytes', 262_144);
+        $maximumBytes = config('nvl-settings.discovery.maximum_file_bytes', 262_144);
         $maximumBytes = is_int($maximumBytes) && $maximumBytes > 0
             ? $maximumBytes
             : 262_144;
@@ -99,7 +99,7 @@ final class DefinitionFileLoader
             );
         }
 
-        $maximumDepth = config('settings.discovery.maximum_json_depth', 64);
+        $maximumDepth = config('nvl-settings.discovery.maximum_json_depth', 64);
         $maximumDepth = is_int($maximumDepth) && $maximumDepth > 0
             ? $maximumDepth
             : 64;

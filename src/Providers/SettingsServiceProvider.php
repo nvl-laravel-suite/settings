@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace Nvl\Settings\Providers;
 
+use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Contracts\Queue\Job;
+use Illuminate\Foundation\Http\Kernel as HttpKernel;
+use Illuminate\Queue\Events\JobAttempted;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -20,6 +26,7 @@ use Nvl\Settings\Commands\ValidateCommand;
 use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Contracts\SettingsAuthorization;
+use Nvl\Settings\Http\Middleware\ApplyPlatformSettingsOverrides;
 use Nvl\Settings\Models\Setting as SettingModel;
 use Nvl\Settings\Observers\SettingCacheObserver;
 use Nvl\Settings\Services\ConfigOverrideApplier;
@@ -27,6 +34,7 @@ use Nvl\Settings\Services\ConfiguredSettingsAuthorization;
 use Nvl\Settings\Services\PlatformConfigWriter;
 use Nvl\Settings\Services\PlatformSettingsBootstrap;
 use Nvl\Settings\Services\PlatformSettingsReader;
+use Nvl\Settings\Services\PlatformSettingsRuntime;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\SettingManager;
@@ -34,10 +42,13 @@ use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingsRules;
 use Nvl\Settings\Tenancy\SettingsResourceRegistrar;
 use Nvl\Support\Doctor\PackageDoctorContributor;
+use Nvl\Support\Globals\GlobalNames;
 use Nvl\Support\Providers\TenantServiceProvider;
 use Nvl\Support\Tenancy\Services\TenantResourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
+use Nvl\Support\Traits\RegistersNamespacedResources;
 use Nvl\Tenancy\Services\TenantAdoptionRegistry;
+use WeakMap;
 
 /**
  * Registers settings discovery, persistence, commands, and optional config overrides.
@@ -45,6 +56,7 @@ use Nvl\Tenancy\Services\TenantAdoptionRegistry;
 final class SettingsServiceProvider extends ServiceProvider
 {
     use MergesPackageConfiguration;
+    use RegistersNamespacedResources;
 
     /**
      * Register package configuration and repository services.
@@ -54,7 +66,7 @@ final class SettingsServiceProvider extends ServiceProvider
         PackageDoctorContributor::register($this->app, 'nvl/settings', fn (): array => $this->app->make(SettingsDoctor::class)->inspect());
 
         $this->app->register(TenantServiceProvider::class);
-        $this->mergePackageConfiguration(__DIR__.'/../../config/settings.php', 'settings');
+        $this->mergePackageConfiguration(__DIR__.'/../../config/nvl-settings.php', 'settings');
         (new SettingsResourceRegistrar)->register($this->app->make(TenantResourceRegistry::class));
         $this->app->booted(function (): void {
             if ($this->app->bound(TenantAdoptionRegistry::class)) {
@@ -66,10 +78,15 @@ final class SettingsServiceProvider extends ServiceProvider
         $this->app->scoped(SettingCache::class);
         $this->app->singleton(PlatformConfigWriter::class);
         $this->app->scoped(PlatformSettingsReader::class);
+        $this->app->scoped(PlatformSettingsRuntime::class);
         $this->app->scoped(PlatformSettingsBootstrap::class);
         $this->app->scoped(ConfigOverrideApplier::class);
         $this->app->scoped(SettingRepository::class, SettingManager::class);
-        $this->app->alias(SettingRepository::class, 'settings');
+        $names = $this->app->make(GlobalNames::class);
+        $exists = fn (string $name): bool => $this->app->bound($name);
+        $install = fn (string $name) => $this->app->alias(SettingRepository::class, $name);
+        $names->reserve('settings', 'container', 'nvl.settings', $exists, $install);
+        $names->register('settings', 'container', 'settings', 'nvl.settings', $exists, $install);
         $this->app->bindIf(SettingsAuthorization::class, ConfiguredSettingsAuthorization::class);
         $this->app->bindIf(
             SettingsAuditContextProvider::class,
@@ -84,16 +101,16 @@ final class SettingsServiceProvider extends ServiceProvider
     {
         $typeScriptSources->register(__DIR__.'/..', 'nvl/settings');
         $this->publishes([
-            __DIR__.'/../../config/settings.php' => config_path('settings.php'),
+            __DIR__.'/../../config/nvl-settings.php' => config_path('nvl-settings.php'),
         ], 'settings-config');
 
         $this->publishesMigrations([
             __DIR__.'/../../database/migrations' => database_path('migrations'),
         ], 'settings-migrations');
-        if ((bool) config('settings.migrations.enabled', true)) {
+        if ((bool) config('nvl-settings.migrations.enabled', true)) {
             $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
         }
-        if ((bool) config('settings.management.enabled', false)) {
+        if ((bool) config('nvl-settings.management.enabled', false)) {
             $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
         }
 
@@ -118,7 +135,7 @@ final class SettingsServiceProvider extends ServiceProvider
 
         $this->registerValidationRules();
 
-        $this->applyConfigOverrides();
+        $this->registerConfigOverrides();
     }
 
     /**
@@ -170,14 +187,34 @@ final class SettingsServiceProvider extends ServiceProvider
     }
 
     /**
-     * Apply opted-in platform overrides inside the provider boot boundary.
+     * Attach opted-in request and job boundaries without reading storage during bootstrap.
      */
-    private function applyConfigOverrides(): void
+    private function registerConfigOverrides(): void
     {
-        if (! config('settings.overrides.enabled')) {
+        if (config('nvl-settings.overrides.enabled') !== true) {
             return;
         }
 
-        $this->app->make(PlatformSettingsBootstrap::class)->apply();
+        $this->callAfterResolving(Kernel::class, static function (Kernel $kernel): void {
+            if ($kernel instanceof HttpKernel) {
+                $kernel->pushMiddleware(ApplyPlatformSettingsOverrides::class);
+            }
+        });
+        $events = $this->app->make(Dispatcher::class);
+        /** @var WeakMap<Job, PlatformSettingsRuntime> $runtimes */
+        $runtimes = new WeakMap;
+        $events->listen(JobProcessing::class, function (JobProcessing $event) use ($runtimes): void {
+            if (! $event->job->isDeleted()) {
+                $runtime = $this->app->make(PlatformSettingsRuntime::class);
+                $runtimes[$event->job] = $runtime;
+                $runtime->apply();
+            }
+        });
+        $events->listen(JobAttempted::class, static function (JobAttempted $event) use ($runtimes): void {
+            if (isset($runtimes[$event->job])) {
+                $runtimes[$event->job]->restore();
+                unset($runtimes[$event->job]);
+            }
+        });
     }
 }

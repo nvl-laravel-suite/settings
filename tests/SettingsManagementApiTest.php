@@ -13,11 +13,11 @@ test('management routes are disabled by default', function (): void {
 });
 
 test('enabled management routes authorize typed reads and optimistic writes', function (): void {
-    config()->set('settings.management.enabled', true);
-    config()->set('settings.management.path', 'api/internal/runtime-settings');
-    config()->set('settings.management.name', 'runtime.settings');
-    config()->set('settings.management.middleware', []);
-    config()->set('settings.management.authorization_ability', 'manage-settings');
+    config()->set('nvl-settings.management.enabled', true);
+    config()->set('nvl-settings.management.path', 'api/internal/runtime-settings');
+    config()->set('nvl-settings.management.name', 'runtime.settings');
+    config()->set('nvl-settings.management.middleware', []);
+    config()->set('nvl-settings.management.authorization_ability', 'manage-settings');
     Gate::define(
         'manage-settings',
         static fn (?Authenticatable $actor, string $ability, ?string $key): bool => in_array(
@@ -69,11 +69,11 @@ test('enabled management routes authorize typed reads and optimistic writes', fu
 });
 
 test('management listing remains bounded with large definition sets', function (): void {
-    config()->set('settings.management.enabled', true);
-    config()->set('settings.management.path', 'api/internal/runtime-settings');
-    config()->set('settings.management.name', 'runtime.settings');
-    config()->set('settings.management.middleware', []);
-    config()->set('settings.management.authorization_ability', 'manage-settings');
+    config()->set('nvl-settings.management.enabled', true);
+    config()->set('nvl-settings.management.path', 'api/internal/runtime-settings');
+    config()->set('nvl-settings.management.name', 'runtime.settings');
+    config()->set('nvl-settings.management.middleware', []);
+    config()->set('nvl-settings.management.authorization_ability', 'manage-settings');
     Gate::define(
         'manage-settings',
         static fn (?Authenticatable $actor, string $ability): bool => $ability === 'list',
@@ -100,11 +100,11 @@ test('management listing remains bounded with large definition sets', function (
 });
 
 test('management routes return stable unknown and stale error contracts', function (): void {
-    config()->set('settings.management.enabled', true);
-    config()->set('settings.management.path', 'api/internal/runtime-settings');
-    config()->set('settings.management.name', 'runtime.settings');
-    config()->set('settings.management.middleware', []);
-    config()->set('settings.management.authorization_ability', 'manage-settings');
+    config()->set('nvl-settings.management.enabled', true);
+    config()->set('nvl-settings.management.path', 'api/internal/runtime-settings');
+    config()->set('nvl-settings.management.name', 'runtime.settings');
+    config()->set('nvl-settings.management.middleware', []);
+    config()->set('nvl-settings.management.authorization_ability', 'manage-settings');
     Gate::define(
         'manage-settings',
         static fn (?Authenticatable $actor, string $ability): bool => in_array(
@@ -149,11 +149,11 @@ test('management routes return stable unknown and stale error contracts', functi
 });
 
 test('management writes require an explicit value and optimistic revision', function (): void {
-    config()->set('settings.management.enabled', true);
-    config()->set('settings.management.path', 'api/internal/runtime-settings');
-    config()->set('settings.management.name', 'runtime.settings');
-    config()->set('settings.management.middleware', []);
-    config()->set('settings.management.authorization_ability', 'manage-settings');
+    config()->set('nvl-settings.management.enabled', true);
+    config()->set('nvl-settings.management.path', 'api/internal/runtime-settings');
+    config()->set('nvl-settings.management.name', 'runtime.settings');
+    config()->set('nvl-settings.management.middleware', []);
+    config()->set('nvl-settings.management.authorization_ability', 'manage-settings');
     Gate::define(
         'manage-settings',
         static fn (?Authenticatable $actor, string $ability): bool => $ability === 'set',

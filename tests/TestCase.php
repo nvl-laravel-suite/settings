@@ -30,10 +30,10 @@ abstract class TestCase extends Orchestra
 
     protected function defineEnvironment($app): void
     {
-        $app['config']->set('settings.discovery.paths', [__DIR__.'/Fixtures/settings']);
-        $app['config']->set('settings.discovery.cache', false);
-        $app['config']->set('settings.cache.enabled', true);
-        $app['config']->set('tenancy.enabled', false);
-        $app['config']->set('tenancy.migrations.enabled', false);
+        $app['config']->set('nvl-settings.discovery.paths', [__DIR__.'/Fixtures/settings']);
+        $app['config']->set('nvl-settings.discovery.cache', false);
+        $app['config']->set('nvl-settings.cache.enabled', true);
+        $app['config']->set('nvl-tenancy.enabled', false);
+        $app['config']->set('nvl-tenancy.migrations.enabled', false);
     }
 }

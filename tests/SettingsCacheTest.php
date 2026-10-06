@@ -20,8 +20,8 @@ it('caches only primitive setting payloads on serialized stores', function (): v
         'catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
     $key = 'nvl:settings:test:'.Str::uuid();
-    config()->set('settings.cache.store', 'file');
-    config()->set('settings.cache.key', $key);
+    config()->set('nvl-settings.cache.store', 'file');
+    config()->set('nvl-settings.cache.key', $key);
     config()->set('cache.serializable_classes', false);
     $repository = app(SettingRepository::class);
 
@@ -47,8 +47,8 @@ it('rebuilds malformed primitive cache payloads before model hydration', functio
         'catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
     $key = 'nvl:settings:test:'.Str::uuid();
-    config()->set('settings.cache.store', 'array');
-    config()->set('settings.cache.key', $key);
+    config()->set('nvl-settings.cache.store', 'array');
+    config()->set('nvl-settings.cache.key', $key);
     $repository = app(SettingRepository::class);
     $repository->set('catalog.enabled', true);
     $repository->get('catalog.enabled');
@@ -82,7 +82,7 @@ it('invalidates cached settings only after the outer transaction commits', funct
     $repository = app(SettingRepository::class);
     $repository->set('catalog.enabled', true);
     expect($repository->get('catalog.enabled'))->toBeTrue();
-    $key = config('settings.cache.key');
+    $key = config('nvl-settings.cache.key');
     $connection = DB::connection((new Setting)->getConnectionName());
 
     $connection->beginTransaction();
@@ -90,12 +90,12 @@ it('invalidates cached settings only after the outer transaction commits', funct
     $setting->value = false;
     $setting->save();
 
-    expect(Cache::store(config('settings.cache.store'))->has($key))->toBeTrue()
+    expect(Cache::store(config('nvl-settings.cache.store'))->has($key))->toBeTrue()
         ->and($repository->get('catalog.enabled'))->toBeFalse();
 
     $connection->rollBack();
 
-    expect(Cache::store(config('settings.cache.store'))->has($key))->toBeTrue()
+    expect(Cache::store(config('nvl-settings.cache.store'))->has($key))->toBeTrue()
         ->and($repository->get('catalog.enabled'))->toBeTrue();
 
     $connection->beginTransaction();
@@ -104,7 +104,7 @@ it('invalidates cached settings only after the outer transaction commits', funct
     $setting->save();
     $connection->commit();
 
-    expect(Cache::store(config('settings.cache.store'))->has($key))->toBeFalse()
+    expect(Cache::store(config('nvl-settings.cache.store'))->has($key))->toBeFalse()
         ->and($repository->get('catalog.enabled'))->toBeFalse();
 });
 
@@ -113,14 +113,14 @@ it('does not publish uncommitted settings into an empty shared cache', function 
         'catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
     $repository = app(SettingRepository::class);
-    $key = config('settings.cache.key');
+    $key = config('nvl-settings.cache.key');
     $connection = DB::connection((new Setting)->getConnectionName());
     $connection->beginTransaction();
 
     try {
         $repository->set('catalog.enabled', true);
         expect($repository->get('catalog.enabled'))->toBeTrue()
-            ->and(Cache::store(config('settings.cache.store'))->has($key))->toBeFalse();
+            ->and(Cache::store(config('nvl-settings.cache.store'))->has($key))->toBeFalse();
     } finally {
         $connection->rollBack();
     }

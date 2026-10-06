@@ -34,7 +34,7 @@ use Nvl\Settings\Tests\TestCase;
 uses(InteractsWithSettings::class);
 
 it('preserves nested settings defaults around consumer overrides', function (): void {
-    config()->set('settings', [
+    config()->set('nvl-settings', [
         'storage' => [
             'table' => 'consumer_settings',
         ],
@@ -42,10 +42,10 @@ it('preserves nested settings defaults around consumer overrides', function (): 
 
     (new SettingsServiceProvider(app()))->register();
 
-    expect(config('settings.storage.table'))->toBe('consumer_settings')
-        ->and(config('settings.storage.connection'))->toBeNull()
-        ->and(config('settings.cache.key'))->toBe('nvl:settings:v2')
-        ->and(config('settings.management.enabled'))->toBeFalse();
+    expect(config('nvl-settings.storage.table'))->toBe('consumer_settings')
+        ->and(config('nvl-settings.storage.connection'))->toBeNull()
+        ->and(config('nvl-settings.cache.key'))->toBe('nvl:settings:v2')
+        ->and(config('nvl-settings.management.enabled'))->toBeFalse();
 });
 
 it('captures non-model audit actors and rejects malformed rule parameters safely', function (): void {
@@ -124,7 +124,7 @@ it('rejects malformed JSON and defaults that violate their declared type', funct
     string $fixture,
     string $message,
 ): void {
-    config()->set('settings.discovery.paths', [__DIR__."/Fixtures/{$fixture}"]);
+    config()->set('nvl-settings.discovery.paths', [__DIR__."/Fixtures/{$fixture}"]);
     app()->forgetInstance(DefinitionRepository::class);
 
     expect(fn () => app(DefinitionRepository::class)->all())
@@ -150,14 +150,14 @@ it('rejects malformed JSON and defaults that violate their declared type', funct
 ]);
 
 it('enforces configured source count and byte limits before parsing', function (): void {
-    config()->set('settings.discovery.maximum_files', 1);
+    config()->set('nvl-settings.discovery.maximum_files', 1);
     app()->forgetInstance(DefinitionRepository::class);
 
     expect(fn () => app(DefinitionRepository::class)->all())
         ->toThrow(InvalidDefinitionException::class, '1-file limit');
 
-    config()->set('settings.discovery.maximum_files', 100);
-    config()->set('settings.discovery.maximum_file_bytes', 32);
+    config()->set('nvl-settings.discovery.maximum_files', 100);
+    config()->set('nvl-settings.discovery.maximum_file_bytes', 32);
     app()->forgetInstance(DefinitionRepository::class);
 
     expect(fn () => app(DefinitionRepository::class)->all())
@@ -165,7 +165,7 @@ it('enforces configured source count and byte limits before parsing', function (
 });
 
 it('returns non-zero command status before sync when a source is invalid', function (): void {
-    config()->set('settings.discovery.paths', [__DIR__.'/Fixtures/invalid-default']);
+    config()->set('nvl-settings.discovery.paths', [__DIR__.'/Fixtures/invalid-default']);
     app()->forgetInstance(DefinitionRepository::class);
 
     $this->artisan('nvl:settings:validate')
@@ -228,7 +228,7 @@ it('applies only explicitly allowed config overrides', function (): void {
         ],
     ]);
 
-    config()->set('settings.overrides.enabled', true);
+    config()->set('nvl-settings.overrides.enabled', true);
     config()->set('app.name', 'Original');
     config()->set('app.key', 'protected');
 
@@ -252,7 +252,7 @@ it('applies mapped definition defaults before settings are synchronized', functi
             'overrides' => 'app.name',
         ],
     ]);
-    config()->set('settings.overrides.enabled', true);
+    config()->set('nvl-settings.overrides.enabled', true);
     config()->set('app.name', 'Original');
 
     app(ConfigOverrideApplier::class)->apply();
@@ -413,7 +413,7 @@ it('resolves many settings with one storage query while preserving input order',
     }
 
     $this->defineSettings($definitions);
-    config()->set('settings.cache.enabled', false);
+    config()->set('nvl-settings.cache.enabled', false);
     app(SettingRepository::class)->set('catalog.item_2', 20);
     $measure = static function (array $keys): array {
         DB::flushQueryLog();
@@ -593,9 +593,9 @@ it('refreshes the discovery cache after definition files are added', function ()
             'enabled' => ['type' => 'bool', 'default' => true],
         ],
     ], JSON_THROW_ON_ERROR));
-    config()->set('settings.discovery.paths', [$source]);
-    config()->set('settings.discovery.cache', true);
-    config()->set('settings.discovery.cache_path', $cache);
+    config()->set('nvl-settings.discovery.paths', [$source]);
+    config()->set('nvl-settings.discovery.cache', true);
+    config()->set('nvl-settings.discovery.cache_path', $cache);
     app()->forgetInstance(DefinitionRepository::class);
 
     try {
@@ -860,7 +860,7 @@ it('rejects setting identity segments that exceed storage limits', function (): 
 });
 
 it('requires exact index uniqueness when diagnosing a consumer table', function (): void {
-    config()->set('settings.storage.table', 'consumer_settings');
+    config()->set('nvl-settings.storage.table', 'consumer_settings');
     $migration = require __DIR__.'/../database/migrations/2026_01_01_000000_nvl_settings_create_settings_table.php';
     $migration->up();
 
@@ -929,7 +929,7 @@ it('continues identifier diagnostics after encountering an invalid value codec',
 });
 
 it('validates configured-table indexes by columns instead of hardcoded names', function (): void {
-    config()->set('settings.storage.table', 'consumer_settings');
+    config()->set('nvl-settings.storage.table', 'consumer_settings');
     $migration = require __DIR__.'/../database/migrations/2026_01_01_000000_nvl_settings_create_settings_table.php';
     $migration->up();
 

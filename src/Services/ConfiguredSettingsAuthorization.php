@@ -19,7 +19,7 @@ final class ConfiguredSettingsAuthorization implements SettingsAuthorization
      */
     public function authorize(SettingAbility $ability, ?string $key = null): void
     {
-        $configuredAbility = config('settings.management.authorization_ability');
+        $configuredAbility = config('nvl-settings.management.authorization_ability');
 
         if (! is_string($configuredAbility) || $configuredAbility === '') {
             throw new AuthorizationException(

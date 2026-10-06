@@ -36,7 +36,7 @@ test('tenant runtime cannot apply process configuration overrides', function ():
             return $this->id;
         }
     });
-    config()->set('settings.overrides.enabled', true);
+    config()->set('nvl-settings.overrides.enabled', true);
     $before = config()->all();
 
     expect(fn () => app(ConfigOverrideApplier::class)->apply())
@@ -61,7 +61,7 @@ test('tenant runtime remains denied when configuration overrides are switched of
             return $this->id;
         }
     });
-    config()->set('settings.overrides.enabled', false);
+    config()->set('nvl-settings.overrides.enabled', false);
 
     expect(fn () => app(ConfigOverrideApplier::class)->apply())
         ->toThrow(TenantBoundaryViolation::class);
@@ -81,7 +81,7 @@ test('unresolved runtime rejects configuration overrides before settings storage
             throw new TenantContextMissing('Tenant context is not resolved.');
         }
     });
-    config()->set('settings.overrides.enabled', true);
+    config()->set('nvl-settings.overrides.enabled', true);
     $before = config()->all();
     DB::flushQueryLog();
     DB::enableQueryLog();
@@ -101,7 +101,7 @@ test('disabled tenancy keeps mapped defaults and persisted overrides without ten
             'overrides' => 'app.name',
         ],
     ]);
-    config()->set('settings.overrides.enabled', true);
+    config()->set('nvl-settings.overrides.enabled', true);
     config()->set('app.name', 'Original');
 
     app(ConfigOverrideApplier::class)->apply();

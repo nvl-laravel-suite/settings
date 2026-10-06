@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Nvl\Settings\Definitions\Tables\SettingsTables;
+use Nvl\Support\Config\PackageEnvironment;
 
 return [
     'discovery' => [
@@ -19,7 +20,7 @@ return [
         'maximum_files' => 1_000,
         'maximum_file_bytes' => 262_144,
         'maximum_json_depth' => 64,
-        'cache' => env('SETTINGS_DISCOVERY_CACHE', true),
+        'cache' => PackageEnvironment::get('NVL_SETTINGS_DISCOVERY_CACHE', true),
         'cache_path' => null,
     ],
 
@@ -44,23 +45,23 @@ return [
 
     'management' => [
         'enabled' => false,
-        'path' => 'api/v1/settings',
+        'path' => 'nvl/api/v1/settings',
         'name' => 'nvl.settings.management.',
         'middleware' => ['api', 'auth', 'throttle:60,1'],
         'authorization_ability' => null,
     ],
 
     'cache' => [
-        'enabled' => env('SETTINGS_CACHE', true),
+        'enabled' => PackageEnvironment::get('NVL_SETTINGS_CACHE', true),
         'store' => null,
         'key' => 'nvl:settings:v2',
     ],
 
     'overrides' => [
-        'enabled' => env('SETTINGS_CONFIG_OVERRIDES', false),
+        'enabled' => PackageEnvironment::get('NVL_SETTINGS_CONFIG_OVERRIDES', false),
         'denied' => [
             'app.key', 'app.debug', 'app.env', 'app.timezone',
-            'database.*', 'cache.*', 'settings.*',
+            'database.*', 'cache.*', 'nvl-settings.*',
         ],
     ],
 ];

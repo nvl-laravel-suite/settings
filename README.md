@@ -11,11 +11,11 @@ See the [installation and publishing guide](https://github.com/nvl-laravel-suite
 
 | Item | Value |
 |---|---|
-| Installed through | `composer require nvl/settings:^2.0` |
+| Installed through | `composer require nvl/settings:^5.0` |
 | Module identifier | `nvl/settings` |
 | PHP namespace | `Nvl\Settings` |
 | Service provider | `Nvl\Settings\Providers\SettingsServiceProvider` |
-| Configuration | `config/settings.php` |
+| Configuration | `config/nvl-settings.php` |
 
 A source-defined, typed runtime settings engine for Laravel applications.
 
@@ -39,23 +39,23 @@ key/value storage, localized content, tenant ownership, or application UI.
 ## Installation
 
 ```bash
-composer require nvl/settings:^2.0
+composer require nvl/settings:^5.0
 php artisan migrate
-php artisan vendor:publish --tag=settings-config
+php artisan vendor:publish --tag=nvl-settings-config
 ```
 
 Package discovery registers `SettingsServiceProvider`. Migrations load
-automatically unless `settings.migrations.enabled` is false.
+automatically unless `nvl-settings.migrations.enabled` is false.
 
 ```bash
-php artisan vendor:publish --tag=settings-skills
+php artisan vendor:publish --tag=nvl-settings-skills
 ```
 
 Choose exactly one migration owner. For automatic vendor loading, leave
-`settings.migrations.enabled=true` and do not publish `settings-migrations`.
+`nvl-settings.migrations.enabled=true` and do not publish `nvl-settings-migrations`.
 For host-owned migrations, run
-`php artisan vendor:publish --tag=settings-migrations`, set
-`settings.migrations.enabled=false` before the first migration, and maintain
+`php artisan vendor:publish --tag=nvl-settings-migrations`, set
+`nvl-settings.migrations.enabled=false` before the first migration, and maintain
 the copied files as application migrations. Never run both sources; Laravel
 retimestamps published migrations.
 
@@ -403,7 +403,7 @@ The API is disabled by default:
 ```php
 'management' => [
     'enabled' => true,
-    'path' => 'api/v1/settings',
+    'path' => 'nvl/api/v1/settings',
     'name' => 'nvl.settings.management.',
     'middleware' => ['api', 'auth', 'throttle:60,1'],
     'authorization_ability' => 'manage-settings',
@@ -495,7 +495,7 @@ When the legacy table is itself named `settings`, keep migrations disabled,
 run Doctor, rename the legacy table to an explicit staging name, create the
 canonical package schema, then run the plan and apply phases. The adoption
 command refuses to read from the configured canonical target table. Manifest
-size and record limits are controlled by `settings.adoption.*`.
+size and record limits are controlled by `nvl-settings.adoption.*`.
 
 ## TypeScript
 
@@ -540,10 +540,14 @@ Run `php artisan nvl:doctor --strict --format=json` to combine the read-only che
 
 ## Next major: isolated schema identities
 
-Use `settings.tables.<logical-key>` for every table and `settings.connection` for its database connection. Null connection inherits `nvl-core.connection`, then Laravel's default. Tables are resolved at runtime by the package table definition helper.
+Use `nvl-settings.tables.<logical-key>` for every table and `nvl-settings.connection` for its database connection. Null connection inherits `nvl-core.connection`, then Laravel's default. Tables are resolved at runtime by the package table definition helper.
 
 | Logical key | New default | Previous name |
 | --- | --- | --- |
 | `settings` | `nvl_settings_settings` | `settings` |
 
-Migration filenames contain `nvl_settings_`. Existing installations must complete the upgrade in `UPGRADING.md` before running new migrations. A pending creator rejects an existing target before any migration in the batch runs; legacy storage with old history needs an ownership decision.
+Migration filenames contain `nvl_settings_`. Existing installations must complete the upgrade in `UPGRADING.md` before running new migrations. A pending creator rejects an existing target before that owned migration runs; use `nvl:schema:preflight` for an explicit whole-batch check; legacy storage with old history needs an ownership decision.
+
+## Canonical configuration ownership
+
+Use `nvl-settings` settings in `config/nvl-settings.php` and canonical package environment names. Old generic roots are foreign unless an upgrading NVL host explicitly selects them in Core's default-off compatibility. Canonical false/null/empty values win; no old roots are populated or written back. Keep logical package/resource IDs unchanged. Review [Core's rename inventory and cache/worker cutover](https://github.com/nvl-laravel-suite/core/blob/main/UPGRADING.md#major-5-canonical-configuration-and-environment).

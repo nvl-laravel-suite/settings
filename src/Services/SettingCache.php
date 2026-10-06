@@ -33,7 +33,7 @@ final readonly class SettingCache
      */
     public function records(): Collection
     {
-        if (! (bool) config('settings.cache.enabled', true)
+        if (! (bool) config('nvl-settings.cache.enabled', true)
             || $this->database->connection((new Setting)->getConnectionName())->transactionLevel() > 0) {
             return $this->fetch();
         }
@@ -182,7 +182,7 @@ final readonly class SettingCache
             'created_at',
             'updated_at',
         ];
-        if (config('tenancy.enabled') === true) {
+        if (config('nvl-tenancy.enabled') === true) {
             $required = [...$required, 'tenant_id', 'ownership_key'];
         }
 
@@ -243,7 +243,7 @@ final readonly class SettingCache
      */
     private function store(): ?string
     {
-        $store = config('settings.cache.store');
+        $store = config('nvl-settings.cache.store');
 
         return is_string($store) && $store !== '' ? $store : null;
     }
@@ -253,7 +253,7 @@ final readonly class SettingCache
      */
     private function key(): string
     {
-        $key = config('settings.cache.key', 'nvl:settings:v2');
+        $key = config('nvl-settings.cache.key', 'nvl:settings:v2');
 
         return is_string($key) && $key !== '' ? $key : 'nvl:settings:v2';
     }

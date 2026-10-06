@@ -45,6 +45,25 @@ final readonly class PlatformConfigWriter
         }
     }
 
+    /** @return array<string, mixed> The current values of allowlisted, existing targets. */
+    public function snapshot(): array
+    {
+        $values = [];
+        foreach ($this->definitions->all() as $definition) {
+            if ($this->mayOverride($definition) && $definition->overrides !== null) {
+                $values[$definition->overrides] = config($definition->overrides);
+            }
+        }
+
+        return $values;
+    }
+
+    /** @param array<string, mixed> $values Restore only previously captured configuration targets. */
+    public function restore(array $values): void
+    {
+        config($values);
+    }
+
     /**
      * Determine whether one definition may override its target.
      */
@@ -54,7 +73,7 @@ final readonly class PlatformConfigWriter
             return false;
         }
 
-        $denied = config('settings.overrides.denied', []);
+        $denied = config('nvl-settings.overrides.denied', []);
 
         foreach (is_array($denied) ? $denied : [] as $pattern) {
             if (is_string($pattern) && Str::is($pattern, $definition->overrides)) {

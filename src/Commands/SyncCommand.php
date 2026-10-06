@@ -33,13 +33,13 @@ final class SyncCommand extends Command implements Isolatable
         $dryRun = $this->option('dry-run') === true;
         $providerOption = $this->option('provider');
         $provider = is_string($providerOption) ? $providerOption : null;
-        $configuredPrune = config('settings.sync.prune', SettingPruneStrategy::Orphan->value);
+        $configuredPrune = config('nvl-settings.sync.prune', SettingPruneStrategy::Orphan->value);
         $prune = $this->option('prune') === true
             ? SettingPruneStrategy::Delete
             : (is_string($configuredPrune)
                 ? SettingPruneStrategy::tryFrom($configuredPrune)
                 : null);
-        $respectDatabaseValues = config('settings.sync.respect_db_values', true) === true;
+        $respectDatabaseValues = config('nvl-settings.sync.respect_db_values', true) === true;
 
         if (! $prune instanceof SettingPruneStrategy) {
             $value = is_scalar($configuredPrune) ? (string) $configuredPrune : get_debug_type($configuredPrune);

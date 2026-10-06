@@ -89,7 +89,7 @@ function recordSettingActivity(SettingChanged $event): void
 - Use `nvl:settings:list`, `nvl:settings:reset`, `nvl:settings:cache`, and `nvl:settings:clear`.
 - Run `nvl:settings:doctor --strict --format=json` before adopting an existing table.
 - Keep the management API disabled by default. Configure
-  `settings.management.path` and `settings.management.name`, use middleware,
+  `nvl-settings.management.path` and `nvl-settings.management.name`, use middleware,
   and authorize status/list/view/set/reset separately.
 
 ## Verify
@@ -114,4 +114,11 @@ Run `php artisan nvl:doctor --strict --format=json` to combine checks from loade
 
 ### Brownfield storage identities
 
-Resolve all package tables through the table helper and canonical `settings.tables.*`, connections through `settings.connection` with Core/Laravel inheritance. Defaults use `nvl_settings_*`; migration filenames include that package slug. Never silently adopt a matching table or generic migration filename. Run shared `nvl:doctor --strict --format=json` and the explicit `nvl:schema:upgrade --package=settings --claim-legacy --dry-run --format=json` before upgrading owned legacy storage. Validate the complete plan and choose one migration owner. Preserve host records, constraint names and stored morph values. Deprecated config inputs last one major; canonical options take precedence.
+Resolve all package tables through the table helper and canonical `nvl-settings.tables.*`, connections through `nvl-settings.connection` with Core/Laravel inheritance. Defaults use `nvl_settings_*`; migration filenames include that package slug. Never silently adopt a matching table or generic migration filename. Run shared `nvl:doctor --strict --format=json` and the explicit `nvl:schema:upgrade --package=settings --claim-legacy --dry-run --format=json` before upgrading owned legacy storage. Validate the complete plan and choose one migration owner. Preserve host records, constraint names and stored morph values. Deprecated config inputs last one major; canonical options take precedence.
+
+## Canonical configuration ownership
+
+- Read/write `nvl-settings` configuration and publish only canonical `nvl-<package>-<resource>` tags. Keep logical package/tenant resource identifiers unchanged.
+- Generic config roots and unprefixed package environment names are foreign by default. For an upgrading NVL host only, select `nvl-core.compatibility.legacy_config` package IDs and `legacy_env` explicitly; both default off. Canonical presence wins, including false/null/empty values. Legacy inputs are read without writing back and are removed in major 6.
+- Use canonical `NVL_<PACKAGE>_*` variables only in config evaluation, then rebuild configuration caches and restart workers after cutover. Shared Laravel environment variables retain their names. Consult Core's versioned `support/resources/global-names.json` for all renames.
+- Old global aliases and legacy route families require separate explicit `global_aliases`/`legacy_routes` package selections. Preserve collisions and use Doctor diagnostics; never grant generic permissions automatically or claim signed-link compatibility without the same authorization/signature checks.

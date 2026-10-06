@@ -81,7 +81,7 @@ final readonly class SettingsDoctor
             'has_override', 'definition_hash', 'revision', 'metadata', 'valid_from',
             'valid_until', 'synced_at', 'orphaned_at', 'created_at', 'updated_at',
         ];
-        $tenantEnabled = config('tenancy.enabled') === true;
+        $tenantEnabled = config('nvl-tenancy.enabled') === true;
         if ($tenantEnabled) {
             $required = [...$required, 'tenant_id', 'ownership_key'];
         }
@@ -351,7 +351,7 @@ final readonly class SettingsDoctor
      */
     private function discoveryCacheCheck(): SettingsDoctorCheckData
     {
-        if (! (bool) config('settings.discovery.cache', true)) {
+        if (! (bool) config('nvl-settings.discovery.cache', true)) {
             return new SettingsDoctorCheckData(
                 key: 'definitions.cache',
                 severity: 'warning',
@@ -392,7 +392,7 @@ final readonly class SettingsDoctor
      */
     private function managementRouteCheck(): SettingsDoctorCheckData
     {
-        if (! (bool) config('settings.management.enabled', false)) {
+        if (! (bool) config('nvl-settings.management.enabled', false)) {
             return new SettingsDoctorCheckData(
                 key: 'management.routes',
                 severity: 'warning',
@@ -413,11 +413,11 @@ final readonly class SettingsDoctor
             );
         }
 
-        $ability = config('settings.management.authorization_ability');
+        $ability = config('nvl-settings.management.authorization_ability');
         $authorizationConfigured = ! $this->authorization instanceof ConfiguredSettingsAuthorization
             || (is_string($ability) && $ability !== '');
         $middleware = array_values(array_filter(
-            (array) config('settings.management.middleware', []),
+            (array) config('nvl-settings.management.middleware', []),
             static fn (mixed $value): bool => is_string($value) && $value !== '',
         ));
         $healthy = $authorizationConfigured

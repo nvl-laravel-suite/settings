@@ -22,6 +22,6 @@ final class Setting extends Facade
      */
     protected static function getFacadeAccessor(): string
     {
-        return 'settings';
+        return 'nvl.settings';
     }
 }

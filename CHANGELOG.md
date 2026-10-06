@@ -4,6 +4,13 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Prepare lockstep major 5 with required and development NVL peer floors of `^5.0`. This candidate has not been tagged or published.
+- Default database config overrides to off and apply explicitly enabled projection only during request/job execution.
+- Restore projected configuration at lifecycle boundaries; discovery and config caching perform no settings queries.
+- Review [UPGRADING.md](UPGRADING.md) before adopting the new names and infrastructure boundaries.
+
 ## [2.2.1] - 2026-09-26
 
 ### Documentation

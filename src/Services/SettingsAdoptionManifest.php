@@ -69,7 +69,7 @@ final readonly class SettingsAdoptionManifest
             throw new InvalidArgumentException('Settings adoption key_replacements must be a source-to-target JSON object.');
         }
 
-        $maximumRecords = config('settings.adoption.maximum_records', 10_000);
+        $maximumRecords = config('nvl-settings.adoption.maximum_records', 10_000);
 
         if (! is_int($maximumRecords) || $maximumRecords < 1) {
             throw new InvalidArgumentException('settings.adoption.maximum_records must be a positive integer.');

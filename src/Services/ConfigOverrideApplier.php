@@ -34,7 +34,7 @@ final readonly class ConfigOverrideApplier
             throw new TenantBoundaryViolation('Settings overrides require the platform bootstrap boundary.');
         }
 
-        if (! (bool) config('settings.overrides.enabled', false)
+        if (! (bool) config('nvl-settings.overrides.enabled', false)
             || ! $this->settings->available()) {
             return;
         }

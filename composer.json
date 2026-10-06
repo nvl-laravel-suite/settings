@@ -14,15 +14,16 @@
         "ext-json": "*",
         "laravel/framework": "^13.0",
         "nesbot/carbon": "^2.72 || ^3.0",
-        "nvl/core": "^2.0",
+        "nvl/core": "^5.0",
         "spatie/laravel-data": "^4.23",
         "spatie/typescript-transformer": "^3.3",
-        "symfony/finder": "^7.0 || ^8.0"
+        "symfony/finder": "^7.0 || ^8.0",
+        "symfony/http-foundation": "^7.0 || ^8.0"
     },
     "require-dev": {
         "larastan/larastan": "^3.10",
         "laravel/pint": "^1.27",
-        "nvl/tenancy": "^2.0",
+        "nvl/tenancy": "^5.0",
         "orchestra/testbench": "^11.0",
         "pestphp/pest": "^4.0",
         "pestphp/pest-plugin-laravel": "^4.0"
@@ -35,7 +36,11 @@
     "autoload-dev": {
         "psr-4": {
             "Nvl\\Settings\\Tests\\": "tests/"
-        }
+        },
+        "exclude-from-classmap": [
+            "tests/Tenancy/PlatformSettingsProviderBootTest.php",
+            "tests/Tenancy/PlatformSettingsNativeBootTest.php"
+        ]
     },
     "scripts": {
         "analyse": "phpstan analyse --memory-limit=2G",
@@ -50,7 +55,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "2.x-dev"
+            "dev-main": "5.x-dev"
         },
         "laravel": {
             "providers": [
@@ -74,12 +79,17 @@
             "/.phpunit.result.cache",
             "/phpstan.neon.dist",
             "/phpunit.xml.dist",
-            "/tests"
+            "/tests",
+            "/.DS_Store",
+            "/**/.DS_Store"
         ]
     },
     "minimum-stability": "stable",
     "prefer-stable": true,
     "suggest": {
         "nvl/tenancy": "Enables enforcing tenant ownership, scoped execution, adoption, and captured tenant queue contexts."
+    },
+    "conflict": {
+        "nvl/tenancy": "<5.0 || >=6.0"
     }
 }

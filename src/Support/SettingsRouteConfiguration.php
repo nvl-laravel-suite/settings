@@ -16,7 +16,7 @@ final class SettingsRouteConfiguration
      */
     public static function path(): string
     {
-        $path = config('settings.management.path', 'api/v1/settings');
+        $path = config('nvl-settings.management.path', 'nvl/api/v1/settings');
 
         if (! is_string($path)) {
             throw new InvalidArgumentException(
@@ -43,7 +43,7 @@ final class SettingsRouteConfiguration
      */
     public static function name(): string
     {
-        $name = config('settings.management.name', 'nvl.settings.management.');
+        $name = config('nvl-settings.management.name', 'nvl.settings.management.');
 
         if (! is_string($name)) {
             throw new InvalidArgumentException(

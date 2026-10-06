@@ -7,7 +7,7 @@ use Nvl\Settings\Http\Controllers\SettingsManagementController;
 use Nvl\Settings\Support\SettingsRouteConfiguration;
 
 $middleware = array_values(array_filter(
-    (array) config('settings.management.middleware', ['api', 'auth']),
+    (array) config('nvl-settings.management.middleware', ['api', 'auth']),
     static fn (mixed $value): bool => is_string($value) && $value !== '',
 ));
 

@@ -22,7 +22,7 @@ return new class extends Migration
     public function up(): void
     {
         $connection = PackageStorage::connection('settings');
-        $configuredTable = config('settings.storage.table', SettingsTables::get(SettingsTables::Settings));
+        $configuredTable = config('nvl-settings.storage.table', SettingsTables::get(SettingsTables::Settings));
         $tableName = is_string($configuredTable) && $configuredTable !== ''
             ? $configuredTable
             : SettingsTables::get(SettingsTables::Settings);
@@ -63,7 +63,7 @@ return new class extends Migration
     public function down(): void
     {
         $connection = PackageStorage::connection('settings');
-        $configuredTable = config('settings.storage.table', SettingsTables::get(SettingsTables::Settings));
+        $configuredTable = config('nvl-settings.storage.table', SettingsTables::get(SettingsTables::Settings));
         $tableName = is_string($configuredTable) && $configuredTable !== ''
             ? $configuredTable
             : SettingsTables::get(SettingsTables::Settings);

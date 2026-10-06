@@ -179,9 +179,9 @@ it('rejects unsafe definition files and invalid source document shapes', functio
             ]], 'valid SettingType'],
         ];
 
-        config()->set('settings.discovery.paths', [$directory]);
-        config()->set('settings.discovery.cache', false);
-        config()->set('settings.discovery.patterns', ['probe.settings.json']);
+        config()->set('nvl-settings.discovery.paths', [$directory]);
+        config()->set('nvl-settings.discovery.cache', false);
+        config()->set('nvl-settings.discovery.patterns', ['probe.settings.json']);
 
         foreach ($invalidDocuments as [$document, $message]) {
             $filesystem->put(
@@ -210,9 +210,9 @@ it('validates discovery cache and management adoption failures', function (): vo
         ],
     ], JSON_THROW_ON_ERROR));
     config()->set([
-        'settings.discovery.paths' => [$directory],
-        'settings.discovery.cache' => true,
-        'settings.discovery.cache_path' => $cache,
+        'nvl-settings.discovery.paths' => [$directory],
+        'nvl-settings.discovery.cache' => true,
+        'nvl-settings.discovery.cache_path' => $cache,
     ]);
 
     try {
@@ -232,24 +232,24 @@ it('validates discovery cache and management adoption failures', function (): vo
         expect($checks['definitions.cache']->passed)->toBeFalse()
             ->and($checks['definitions.cache']->message)->toContain('stale');
 
-        config()->set('settings.discovery.cache_path', ['/invalid']);
+        config()->set('nvl-settings.discovery.cache_path', ['/invalid']);
         app()->forgetInstance(DefinitionRepository::class);
         expect(fn () => app(DefinitionRepository::class)->cachePath())
             ->toThrow(InvalidDefinitionException::class, 'absolute path');
 
-        config()->set('settings.discovery.cache_path', '/tmp/outside-settings-cache.php');
+        config()->set('nvl-settings.discovery.cache_path', '/tmp/outside-settings-cache.php');
         app()->forgetInstance(DefinitionRepository::class);
         expect(fn () => app(DefinitionRepository::class)->cachePath())
             ->toThrow(InvalidDefinitionException::class, 'remain below');
 
         config()->set([
-            'settings.discovery.cache' => false,
-            'settings.storage.table' => 'missing_consumer_settings',
+            'nvl-settings.discovery.cache' => false,
+            'nvl-settings.storage.table' => 'missing_consumer_settings',
         ]);
         $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
         expect($checks['schema.table']->passed)->toBeFalse();
 
-        config()->set('settings.storage.table', 'incomplete_consumer_settings');
+        config()->set('nvl-settings.storage.table', 'incomplete_consumer_settings');
         Schema::create('incomplete_consumer_settings', function ($table): void {
             $table->uuid('id')->primary();
         });
@@ -258,43 +258,43 @@ it('validates discovery cache and management adoption failures', function (): vo
         Schema::drop('incomplete_consumer_settings');
 
         config()->set([
-            'settings.storage.table' => 'settings',
-            'settings.management.enabled' => true,
-            'settings.management.path' => '../unsafe',
+            'nvl-settings.storage.table' => 'settings',
+            'nvl-settings.management.enabled' => true,
+            'nvl-settings.management.path' => '../unsafe',
         ]);
         $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
         expect($checks['management.routes']->passed)->toBeFalse();
 
         config()->set([
-            'settings.management.path' => 'api/consumer/settings',
-            'settings.management.name' => 'consumer.settings',
-            'settings.management.middleware' => ['api'],
-            'settings.management.authorization_ability' => null,
+            'nvl-settings.management.path' => 'api/consumer/settings',
+            'nvl-settings.management.name' => 'consumer.settings',
+            'nvl-settings.management.middleware' => ['api'],
+            'nvl-settings.management.authorization_ability' => null,
         ]);
         $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
         expect($checks['management.routes']->message)->toContain('authorization');
 
         config()->set([
-            'settings.management.authorization_ability' => 'manage-settings',
-            'settings.management.middleware' => [],
+            'nvl-settings.management.authorization_ability' => 'manage-settings',
+            'nvl-settings.management.middleware' => [],
         ]);
         $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
         expect($checks['management.routes']->message)->toContain('middleware');
 
-        config()->set('settings.management.middleware', ['api']);
+        config()->set('nvl-settings.management.middleware', ['api']);
         $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
         expect($checks['management.routes']->message)->toContain('not registered');
 
-        config()->set('settings.management.path', 42);
+        config()->set('nvl-settings.management.path', 42);
         expect(fn () => SettingsRouteConfiguration::path())
             ->toThrow(InvalidArgumentException::class, 'must be a string');
-        config()->set('settings.management.path', '');
+        config()->set('nvl-settings.management.path', '');
         expect(fn () => SettingsRouteConfiguration::path())
             ->toThrow(InvalidArgumentException::class, 'safe');
-        config()->set('settings.management.name', 42);
+        config()->set('nvl-settings.management.name', 42);
         expect(fn () => SettingsRouteConfiguration::name())
             ->toThrow(InvalidArgumentException::class, 'must be a string');
-        config()->set('settings.management.name', 'bad name');
+        config()->set('nvl-settings.management.name', 'bad name');
         expect(fn () => SettingsRouteConfiguration::name())
             ->toThrow(InvalidArgumentException::class, 'safe');
     } finally {
@@ -355,11 +355,11 @@ it('exercises filtered management reads and operational commands', function (): 
         '--changed' => true,
     ])->assertSuccessful();
 
-    config()->set('settings.sync.prune', []);
+    config()->set('nvl-settings.sync.prune', []);
     $this->artisan('nvl:settings:sync')
         ->expectsOutputToContain('Unsupported settings prune strategy')
         ->assertFailed();
-    config()->set('settings.sync.prune', 'orphan');
+    config()->set('nvl-settings.sync.prune', 'orphan');
 
     $this->artisan('nvl:settings:sync', ['--provider' => 'catalog'])
         ->assertSuccessful();

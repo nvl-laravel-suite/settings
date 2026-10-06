@@ -21,6 +21,8 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
 
     protected bool $enableBootstrap = false;
 
+    protected ?bool $enableTenancy = null;
+
     protected string $databasePath;
 
     private string $temporaryDatabasePath;
@@ -83,12 +85,12 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
             'database.default' => 'sqlite',
             'database.connections.sqlite.database' => $this->databasePath,
             'app.name' => 'Original platform',
-            'settings.discovery.paths' => [__DIR__.'/Fixtures/platform-settings'],
-            'settings.discovery.cache' => false,
-            'settings.cache.enabled' => false,
-            'settings.overrides.enabled' => $this->enableBootstrap,
-            'tenancy.enabled' => $this->enableBootstrap,
-            'tenancy.migrations.enabled' => false,
+            'nvl-settings.discovery.paths' => [__DIR__.'/Fixtures/platform-settings'],
+            'nvl-settings.discovery.cache' => false,
+            'nvl-settings.cache.enabled' => false,
+            'nvl-settings.overrides.enabled' => $this->enableBootstrap,
+            'nvl-tenancy.enabled' => $this->enableTenancy ?? $this->enableBootstrap,
+            'nvl-tenancy.migrations.enabled' => false,
         ]);
     }
 }

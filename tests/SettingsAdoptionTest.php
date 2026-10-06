@@ -164,7 +164,7 @@ it('fails loudly for incomplete maps counts and same-name legacy collisions', fu
 });
 
 it('distinguishes a same-name legacy table from the canonical package schema', function (): void {
-    config()->set('settings.storage.table', 'legacy_named_settings');
+    config()->set('nvl-settings.storage.table', 'legacy_named_settings');
     Schema::create('legacy_named_settings', function (Blueprint $table): void {
         $table->string('key')->primary();
         $table->text('value')->nullable();
@@ -231,8 +231,8 @@ it('validates typed JSON lists and maps from portable source rules', function ()
         ],
     ], JSON_THROW_ON_ERROR));
     config()->set([
-        'settings.discovery.paths' => [$directory],
-        'settings.discovery.cache' => false,
+        'nvl-settings.discovery.paths' => [$directory],
+        'nvl-settings.discovery.cache' => false,
     ]);
     app()->forgetInstance(DefinitionRepository::class);
 

@@ -38,7 +38,7 @@ final class AdoptCommand extends Command
         $path = str_starts_with($manifestPath, DIRECTORY_SEPARATOR)
             ? $manifestPath
             : base_path($manifestPath);
-        $maximumBytes = config('settings.adoption.maximum_manifest_bytes', 1_048_576);
+        $maximumBytes = config('nvl-settings.adoption.maximum_manifest_bytes', 1_048_576);
 
         if (! is_int($maximumBytes) || $maximumBytes < 1) {
             throw new InvalidArgumentException('settings.adoption.maximum_manifest_bytes must be a positive integer.');
