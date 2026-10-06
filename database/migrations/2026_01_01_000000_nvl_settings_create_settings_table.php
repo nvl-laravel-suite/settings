@@ -6,26 +6,30 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Nvl\Settings\Definitions\Tables\SettingsTables;
+use Nvl\Support\Config\PackageStorage;
 
 return new class extends Migration
 {
+    /** Use the effective package connection for Laravel's migration transaction. */
+    public function getConnection(): ?string
+    {
+        return PackageStorage::connection('settings');
+    }
+
     /**
      * Create the complete clean-install Settings schema.
      */
     public function up(): void
     {
-        $configuredConnection = config('settings.storage.connection');
-        $connection = is_string($configuredConnection) && $configuredConnection !== ''
-            ? $configuredConnection
-            : null;
-        $configuredTable = config('settings.storage.table', SettingsTables::Settings);
+        $connection = PackageStorage::connection('settings');
+        $configuredTable = config('settings.storage.table', SettingsTables::get(SettingsTables::Settings));
         $tableName = is_string($configuredTable) && $configuredTable !== ''
             ? $configuredTable
-            : SettingsTables::Settings;
+            : SettingsTables::get(SettingsTables::Settings);
         $schema = Schema::connection($connection);
 
         if ($schema->hasTable($tableName)) {
-            return;
+            throw new LogicException('Existing package table is not owned by this migration. Run nvl:doctor --strict and use nvl:schema:upgrade for a verified legacy installation.');
         }
 
         $schema->create($tableName, function (Blueprint $table): void {
@@ -58,14 +62,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        $configuredConnection = config('settings.storage.connection');
-        $connection = is_string($configuredConnection) && $configuredConnection !== ''
-            ? $configuredConnection
-            : null;
-        $configuredTable = config('settings.storage.table', SettingsTables::Settings);
+        $connection = PackageStorage::connection('settings');
+        $configuredTable = config('settings.storage.table', SettingsTables::get(SettingsTables::Settings));
         $tableName = is_string($configuredTable) && $configuredTable !== ''
             ? $configuredTable
-            : SettingsTables::Settings;
+            : SettingsTables::get(SettingsTables::Settings);
 
         Schema::connection($connection)->dropIfExists($tableName);
     }

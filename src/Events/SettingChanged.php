@@ -8,8 +8,8 @@ use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Foundation\Events\Dispatchable;
 use Nvl\Settings\Data\SettingAuditContextData;
 use Nvl\Settings\Data\SettingSubjectReferenceData;
-use Nvl\Tenancy\Contracts\TenantQueuedJob;
-use Nvl\Tenancy\ValueObjects\TenantJobEnvelope;
+use Nvl\Support\Tenancy\Contracts\TenantQueuedJob;
+use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 
 /**
  * Signals a committed runtime setting mutation without serializing its value.

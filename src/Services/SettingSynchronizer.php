@@ -14,7 +14,7 @@ use Nvl\Settings\Data\SettingSyncResultData;
 use Nvl\Settings\Enums\SettingPruneStrategy;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Aligns persisted settings with source definitions without replacing live overrides.

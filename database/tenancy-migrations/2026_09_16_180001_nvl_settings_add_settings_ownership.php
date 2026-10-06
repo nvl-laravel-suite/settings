@@ -5,9 +5,17 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Nvl\Settings\Models\Setting;
+use Nvl\Support\Config\PackageStorage;
+use Nvl\Support\Schema\SchemaConstraints;
 
 return new class extends Migration
 {
+    /** Use the effective package connection for Laravel's migration transaction. */
+    public function getConnection(): ?string
+    {
+        return PackageStorage::connection('settings');
+    }
+
     /** Expand Settings identity from a global key to a mixed ownership key. */
     public function up(): void
     {
@@ -26,8 +34,8 @@ return new class extends Migration
             });
         }
 
-        $schema->table($tableName, static function (Blueprint $table): void {
-            $table->dropUnique(['namespace', 'scope', 'key']);
+        $schema->table($tableName, static function (Blueprint $table) use ($schema): void {
+            SchemaConstraints::drop($schema, $table, 'unique', ['namespace', 'scope', 'key']);
             $table->unique(['ownership_key', 'namespace', 'scope', 'key'], 'settings_ownership_identity_unique');
             $table->index(['tenant_id', 'namespace', 'scope', 'key'], 'settings_tenant_lookup_idx');
         });

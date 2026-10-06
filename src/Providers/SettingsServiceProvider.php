@@ -28,14 +28,16 @@ use Nvl\Settings\Services\PlatformConfigWriter;
 use Nvl\Settings\Services\PlatformSettingsBootstrap;
 use Nvl\Settings\Services\PlatformSettingsReader;
 use Nvl\Settings\Services\SettingCache;
+use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\SettingManager;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingsRules;
 use Nvl\Settings\Tenancy\SettingsResourceRegistrar;
+use Nvl\Support\Doctor\PackageDoctorContributor;
+use Nvl\Support\Providers\TenantServiceProvider;
+use Nvl\Support\Tenancy\Services\TenantResourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
-use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Nvl\Tenancy\Services\TenantAdoptionRegistry;
-use Nvl\Tenancy\Services\TenantResourceRegistry;
 
 /**
  * Registers settings discovery, persistence, commands, and optional config overrides.
@@ -49,12 +51,16 @@ final class SettingsServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->register(TenancyServiceProvider::class);
+        PackageDoctorContributor::register($this->app, 'nvl/settings', fn (): array => $this->app->make(SettingsDoctor::class)->inspect());
+
+        $this->app->register(TenantServiceProvider::class);
         $this->mergePackageConfiguration(__DIR__.'/../../config/settings.php', 'settings');
-        (new SettingsResourceRegistrar)->register(
-            $this->app->make(TenantResourceRegistry::class),
-            $this->app->make(TenantAdoptionRegistry::class),
-        );
+        (new SettingsResourceRegistrar)->register($this->app->make(TenantResourceRegistry::class));
+        $this->app->booted(function (): void {
+            if ($this->app->bound(TenantAdoptionRegistry::class)) {
+                (new SettingsResourceRegistrar)->register($this->app->make(TenantResourceRegistry::class), $this->app->make(TenantAdoptionRegistry::class));
+            }
+        });
 
         $this->app->singleton(DefinitionRepository::class);
         $this->app->scoped(SettingCache::class);

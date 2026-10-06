@@ -9,8 +9,8 @@ use Illuminate\Support\Collection;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Tenancy\Exceptions\TenantSchemaNotReady;
-use Nvl\Tenancy\Services\TenantInstallationState;
+use Nvl\Support\Tenancy\Contracts\TenantInstallationState;
+use Nvl\Support\Tenancy\Exceptions\TenantSchemaNotReady;
 
 /**
  * Reads only config-mapped records from the canonical legacy platform store.

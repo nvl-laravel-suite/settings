@@ -861,7 +861,7 @@ it('rejects setting identity segments that exceed storage limits', function (): 
 
 it('requires exact index uniqueness when diagnosing a consumer table', function (): void {
     config()->set('settings.storage.table', 'consumer_settings');
-    $migration = require __DIR__.'/../database/migrations/2026_01_01_000000_create_settings_table.php';
+    $migration = require __DIR__.'/../database/migrations/2026_01_01_000000_nvl_settings_create_settings_table.php';
     $migration->up();
 
     try {
@@ -930,7 +930,7 @@ it('continues identifier diagnostics after encountering an invalid value codec',
 
 it('validates configured-table indexes by columns instead of hardcoded names', function (): void {
     config()->set('settings.storage.table', 'consumer_settings');
-    $migration = require __DIR__.'/../database/migrations/2026_01_01_000000_create_settings_table.php';
+    $migration = require __DIR__.'/../database/migrations/2026_01_01_000000_nvl_settings_create_settings_table.php';
     $migration->up();
 
     try {

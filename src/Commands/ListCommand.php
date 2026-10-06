@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 use Stringable;
 
 /**

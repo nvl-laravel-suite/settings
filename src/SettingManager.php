@@ -15,9 +15,9 @@ use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Services\SettingValueValidator;
 use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Services\TenantBoundary;
-use Nvl\Tenancy\ValueObjects\TenantJobEnvelope;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 
 /**
  * Resolves validated setting definitions against database-backed overrides.

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Nvl\Settings\Casts\SettingValueCast;
 use Nvl\Settings\Definitions\Tables\SettingsTables;
 use Nvl\Settings\Enums\SettingType;
+use Nvl\Support\Config\PackageStorage;
 
 /**
  * Persisted setting definition fallback and optional custom value.
@@ -74,9 +75,7 @@ final class Setting extends Model
      */
     public function getTable(): string
     {
-        $table = config('settings.storage.table', SettingsTables::Settings);
-
-        return is_string($table) && $table !== '' ? $table : SettingsTables::Settings;
+        return SettingsTables::get(SettingsTables::Settings);
     }
 
     /**
@@ -84,9 +83,7 @@ final class Setting extends Model
      */
     public function getConnectionName(): ?string
     {
-        $connection = config('settings.storage.connection');
-
-        return is_string($connection) && $connection !== '' ? $connection : null;
+        return PackageStorage::connectionName($this->connection ?? PackageStorage::connection('settings') ?? parent::getConnectionName());
     }
 
     /**

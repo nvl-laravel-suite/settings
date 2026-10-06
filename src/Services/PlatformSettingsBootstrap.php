@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Settings\Services;
 
 use Illuminate\Contracts\Foundation\Application;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
 
 /**
  * Applies platform configuration only during Laravel application bootstrap.

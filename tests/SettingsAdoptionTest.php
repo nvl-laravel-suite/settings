@@ -15,6 +15,7 @@ use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Data\SettingAuditContextData;
 use Nvl\Settings\Data\SettingMutationData;
+use Nvl\Settings\Definitions\Tables\SettingsTables;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Events\SettingChanged;
 use Nvl\Settings\Models\Setting;
@@ -156,7 +157,7 @@ it('fails loudly for incomplete maps counts and same-name legacy collisions', fu
         ]))->toThrow(InvalidArgumentException::class, 'expected_count')
         ->and(fn () => $action->execute([
             'version' => 1,
-            'source_table' => 'settings',
+            'source_table' => SettingsTables::Settings,
             'expected_count' => 1,
             'key_replacements' => ['legacy.core.enabled' => 'core.enabled'],
         ]))->toThrow(InvalidArgumentException::class, 'collides');

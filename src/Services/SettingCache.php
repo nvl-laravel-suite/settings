@@ -9,7 +9,7 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Collection;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Tenancy\Services\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
 
 /**
  * Caches setting records as primitive attributes and invalidates them after commits.

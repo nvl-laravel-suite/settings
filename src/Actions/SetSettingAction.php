@@ -20,10 +20,10 @@ use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Services\SettingValueValidator;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
-use Nvl\Tenancy\Services\TenantBoundary;
-use Nvl\Tenancy\ValueObjects\TenantJobEnvelope;
+use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Tenancy\Contracts\TenantContext;
+use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 use Spatie\LaravelData\Optional;
 
 /**
