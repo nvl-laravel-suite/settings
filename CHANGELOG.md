@@ -3,13 +3,15 @@
 
 All notable changes to `nvl/settings` are documented here.
 
-## [5.0.0] — release candidate (unpublished)
+## [Unreleased]
+
+## [5.0.0] - 2026-10-08
 
 ### Changed
 
 - SettingRepository keeps its scoped lifetime using scopedIf. The Setting facade continues through the alias of this same contract. InteractsWithSettings retains definition-only scope. Document contract substitution and truthful host fixtures in Testing your app.
 - Classify the supported consumer PHP surface with explicit source annotations and restrict package model handles to declared identity and in-memory read fields; preserve existing workflow behavior and concrete signatures.
-- Prepare lockstep major 5 with required and development NVL peer floors of `^5.0`. This candidate has not been tagged or published.
+- Adopt lockstep major 5 with required and development NVL peer floors of `^5.0`.
 - Default database config overrides to off and apply explicitly enabled projection only during request/job execution.
 - Restore projected configuration at lifecycle boundaries; discovery and config caching perform no settings queries.
 - Review [UPGRADING.md](UPGRADING.md) before adopting the new names and infrastructure boundaries.
