@@ -9,6 +9,9 @@ use Illuminate\Support\Collection;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
+use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
+use Nvl\Support\Ownership\Services\OwnershipScope;
 use Nvl\Support\Tenancy\Contracts\TenantInstallationState;
 use Nvl\Support\Tenancy\Exceptions\TenantSchemaNotReady;
 
@@ -25,6 +28,8 @@ final readonly class PlatformSettingsReader
     public function __construct(
         private DefinitionRepository $definitions,
         private TenantInstallationState $installation,
+        private OwnershipReadiness $ownership,
+        private OwnershipResourceRegistry $resources,
     ) {}
 
     /**
@@ -40,6 +45,11 @@ final readonly class PlatformSettingsReader
 
         if (! $schema->hasTable($setting->getTable())) {
             return false;
+        }
+        if ($this->resources->get('settings.values')->ownership->strategy === 'captured') {
+            $this->ownership->assertActive('settings.values');
+
+            return true;
         }
 
         $hasOwnership = $schema->hasColumn($setting->getTable(), 'ownership_key');
@@ -78,8 +88,10 @@ final readonly class PlatformSettingsReader
             return (new Setting)->newCollection();
         }
 
-        $query = Setting::query();
-        if ($query->getModel()->getConnection()->getSchemaBuilder()->hasColumn($query->getModel()->getTable(), 'ownership_key')) {
+        $query = Setting::query()->withoutGlobalScope(OwnershipScope::class)->useWritePdo();
+        if ($this->resources->get('settings.values')->ownership->strategy === 'captured') {
+            $query->where('owner_scope_key', 'central')->whereNull('owner_reference');
+        } elseif ($query->getModel()->getConnection()->getSchemaBuilder()->hasColumn($query->getModel()->getTable(), 'ownership_key')) {
             $query->where('ownership_key', 'platform');
         }
 

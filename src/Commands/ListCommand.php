@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Stringable;
 
 /**
@@ -23,7 +23,7 @@ final class ListCommand extends Command
     /**
      * Render the filtered setting definitions.
      */
-    public function handle(DefinitionRepository $repository, TenantBoundary $boundary): int
+    public function handle(DefinitionRepository $repository, OwnershipBoundary $boundary): int
     {
         $namespaceOption = $this->option('namespace');
         $namespaceFilter = is_string($namespaceOption) ? $namespaceOption : null;

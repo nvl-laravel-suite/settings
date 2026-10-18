@@ -10,7 +10,7 @@ use Nvl\Settings\Contracts\GetManySettingsContract;
 use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Resolves a bounded collection of setting keys with one storage query.
@@ -24,7 +24,7 @@ final readonly class GetManySettingsAction implements GetManySettingsContract
      */
     public function __construct(
         private DefinitionRepository $definitions,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**

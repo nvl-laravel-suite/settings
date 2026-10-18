@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 use Nvl\Data\Services\TypeScriptSourceRegistry;
+use Nvl\Ownership\Services\OwnershipAdoptionRegistry;
 use Nvl\Settings\Actions\GetManySettingsAction;
 use Nvl\Settings\Actions\GetSettingAction;
 use Nvl\Settings\Actions\ListSettingsAction;
@@ -41,6 +42,9 @@ use Nvl\Settings\Contracts\ValidateSettingsSourcesContract;
 use Nvl\Settings\Http\Middleware\ApplyPlatformSettingsOverrides;
 use Nvl\Settings\Models\Setting as SettingModel;
 use Nvl\Settings\Observers\SettingCacheObserver;
+use Nvl\Settings\Ownership\SettingsAdoptionAdapter as OwnershipAdopter;
+use Nvl\Settings\Ownership\SettingsContextParticipant;
+use Nvl\Settings\Ownership\SettingsResourceRegistrar as OwnershipRegistrar;
 use Nvl\Settings\Services\ConfigOverrideApplier;
 use Nvl\Settings\Services\ConfiguredSettingsAuthorization;
 use Nvl\Settings\Services\PlatformConfigWriter;
@@ -55,6 +59,9 @@ use Nvl\Settings\Support\SettingsRules;
 use Nvl\Settings\Tenancy\SettingsResourceRegistrar;
 use Nvl\Support\Doctor\PackageDoctorContributor;
 use Nvl\Support\Globals\GlobalNames;
+use Nvl\Support\Ownership\Contracts\OwnershipIntegratedProvider;
+use Nvl\Support\Ownership\Services\OwnershipContextParticipants;
+use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Providers\TenantServiceProvider;
 use Nvl\Support\Tenancy\Services\TenantResourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
@@ -65,7 +72,7 @@ use WeakMap;
 /**
  * Registers settings discovery, persistence, commands, and optional config overrides.
  */
-final class SettingsServiceProvider extends ServiceProvider
+final class SettingsServiceProvider extends ServiceProvider implements OwnershipIntegratedProvider
 {
     use MergesPackageConfiguration;
     use RegistersNamespacedResources;
@@ -88,6 +95,9 @@ final class SettingsServiceProvider extends ServiceProvider
         $this->mergePackageConfiguration(__DIR__.'/../../config/nvl-settings.php', 'settings');
         (new SettingsResourceRegistrar)->register($this->app->make(TenantResourceRegistry::class));
         $this->app->booted(function (): void {
+            if ($this->app->bound(OwnershipAdoptionRegistry::class)) {
+                $this->app->make(OwnershipAdoptionRegistry::class)->register('settings', OwnershipAdopter::class);
+            }
             if ($this->app->bound(TenantAdoptionRegistry::class)) {
                 (new SettingsResourceRegistrar)->register($this->app->make(TenantResourceRegistry::class), $this->app->make(TenantAdoptionRegistry::class));
             }
@@ -118,6 +128,8 @@ final class SettingsServiceProvider extends ServiceProvider
      */
     public function boot(TypeScriptSourceRegistry $typeScriptSources): void
     {
+        (new OwnershipRegistrar)->register($this->app->make(OwnershipResourceRegistry::class), $this->app->make('config')->get('nvl-ownership.enabled') === true);
+        $this->app->make(OwnershipContextParticipants::class)->register(SettingsContextParticipant::class);
         $this->app->make(GlobalNames::class)->translations('settings', __DIR__.'/../../lang', $this->app->make('translation.loader'));
         $this->publishes([
             __DIR__.'/../../lang' => lang_path('vendor/nvl-settings'),

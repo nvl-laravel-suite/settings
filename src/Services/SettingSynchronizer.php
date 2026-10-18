@@ -14,7 +14,7 @@ use Nvl\Settings\Data\SettingSyncResultData;
 use Nvl\Settings\Enums\SettingPruneStrategy;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Aligns persisted settings with source definitions without replacing live overrides.
@@ -33,7 +33,8 @@ final readonly class SettingSynchronizer
         private DatabaseManager $database,
         private SettingValueValidator $values,
         private SettingCache $cache,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
+        private SettingCreator $creator,
     ) {}
 
     /**
@@ -91,7 +92,7 @@ final readonly class SettingSynchronizer
                 $setting = $existing->get($fullKey);
 
                 if (! $setting instanceof Setting) {
-                    Setting::query()->insertOrIgnore([
+                    $this->creator->insert([
                         'id' => (string) Str::uuid(),
                         ...$this->boundary->attributes('settings.values'),
                         'namespace' => $definition->namespace,
@@ -156,7 +157,7 @@ final readonly class SettingSynchronizer
                     $revision++;
                 }
 
-                Setting::query()->whereKey($setting->getKey())->update([
+                $setting->setRawAttributes([...$setting->getAttributes(), ...[
                     'type' => $definition->type->value,
                     'value' => $clearOverride ? null : $canonicalValue,
                     'has_override' => $clearOverride ? false : $setting->has_override,
@@ -169,7 +170,8 @@ final readonly class SettingSynchronizer
                     'synced_at' => $now,
                     'orphaned_at' => null,
                     'updated_at' => $now,
-                ]);
+                ]]);
+                $setting->saveQuietly();
             }
 
             $orphaned = $prune === SettingPruneStrategy::Ignore
@@ -242,11 +244,9 @@ final readonly class SettingSynchronizer
         }
 
         if ($prune === SettingPruneStrategy::Delete) {
-            $ids = $orphaned
-                ->map(static fn (Setting $setting): string => $setting->id)
-                ->values()
-                ->all();
-            Setting::query()->whereKey($ids)->delete();
+            foreach ($orphaned as $setting) {
+                $setting->delete();
+            }
 
             return;
         }
@@ -256,11 +256,11 @@ final readonly class SettingSynchronizer
                 continue;
             }
 
-            Setting::query()->whereKey($setting->getKey())->update([
+            $setting->forceFill([
                 'orphaned_at' => $now,
                 'revision' => $setting->revision + 1,
                 'updated_at' => $now,
-            ]);
+            ])->save();
         }
     }
 

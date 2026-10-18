@@ -328,6 +328,7 @@
             "file": "src/Events/SettingChanged.php",
             "methods": [
                 "__construct",
+                "ownershipJobEnvelope",
                 "schemaVersion",
                 "tenantJobEnvelope"
             ],

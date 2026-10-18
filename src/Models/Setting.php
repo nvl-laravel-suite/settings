@@ -13,6 +13,8 @@ use Nvl\Settings\Database\Factories\SettingFactory;
 use Nvl\Settings\Definitions\Tables\SettingsTables;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Support\Config\PackageStorage;
+use Nvl\Support\Ownership\Contracts\Ownable;
+use Nvl\Support\Ownership\Traits\HasOwnership;
 
 /**
  * Persisted setting definition fallback and optional custom value.
@@ -20,6 +22,8 @@ use Nvl\Support\Config\PackageStorage;
  * @property string $id
  * @property string|null $tenant_id
  * @property string|null $ownership_key
+ * @property string|null $owner_scope_key
+ * @property string|null $owner_reference
  * @property string $namespace
  * @property string $scope
  * @property string $key
@@ -39,11 +43,12 @@ use Nvl\Support\Config\PackageStorage;
  *
  * @api
  */
-final class Setting extends Model
+final class Setting extends Model implements Ownable
 {
     /** @use HasFactory<SettingFactory> */
     use HasFactory;
 
+    use HasOwnership;
     use HasUuids;
 
     /**

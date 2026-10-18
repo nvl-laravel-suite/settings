@@ -8,7 +8,7 @@ use Nvl\Settings\Contracts\GetSettingContract;
 use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Resolves one defined setting with explicit source metadata.
@@ -22,7 +22,7 @@ final readonly class GetSettingAction implements GetSettingContract
      */
     public function __construct(
         private DefinitionRepository $definitions,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**

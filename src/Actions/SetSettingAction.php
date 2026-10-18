@@ -19,10 +19,13 @@ use Nvl\Settings\Events\SettingChanged;
 use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
+use Nvl\Settings\Services\SettingCreator;
 use Nvl\Settings\Services\SettingValueValidator;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
 use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
@@ -43,8 +46,10 @@ final readonly class SetSettingAction implements SetSettingContract
         private SettingCache $cache,
         private SettingValueValidator $values,
         private SettingsAuditContextProvider $auditContext,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
+        private SettingCreator $creator,
         private TenantContext $tenantContext,
+        private OwnershipContext $ownershipContext,
         private DomainEventDispatcher $domainEvents,
     ) {}
 
@@ -57,7 +62,7 @@ final readonly class SetSettingAction implements SetSettingContract
     {
         $definition = $this->definitions->get($data->key);
         $ownership = $this->boundary->attributes('settings.values');
-        if (isset($ownership['tenant_id']) && ! $definition->tenantOverride) {
+        if ((isset($ownership['tenant_id']) || (isset($ownership['owner_scope_key']) && $ownership['owner_scope_key'] !== 'central')) && ! $definition->tenantOverride) {
             throw new TenantBoundaryViolation('This setting does not permit tenant overrides.');
         }
         $this->values->validate($definition, $data->value);
@@ -121,7 +126,7 @@ final readonly class SetSettingAction implements SetSettingContract
                 }
 
                 $now = now();
-                $inserted = Setting::query()->insertOrIgnore([
+                $inserted = $this->creator->insert([
                     'id' => (string) Str::uuid(),
                     ...$this->boundary->attributes('settings.values'),
                     'namespace' => $definition->namespace,
@@ -194,7 +199,7 @@ final readonly class SetSettingAction implements SetSettingContract
                 $tenantId = is_string($setting->tenant_id) ? $setting->tenant_id : null;
                 $ownershipKey = is_string($setting->ownership_key) ? $setting->ownership_key : 'platform';
                 $context = $this->auditContext->current();
-                $event = new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
+                $event = new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext), ownershipEnvelope: OwnershipJobEnvelope::capture($this->ownershipContext));
                 $this->domainEvents->dispatch($event, $connection);
             }
 

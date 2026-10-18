@@ -14,7 +14,9 @@ use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 
@@ -32,8 +34,9 @@ final readonly class ResetSettingAction implements ResetSettingContract
         private DefinitionRepository $definitions,
         private SettingCache $cache,
         private SettingsAuditContextProvider $auditContext,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
         private TenantContext $tenantContext,
+        private OwnershipContext $ownershipContext,
         private DomainEventDispatcher $domainEvents,
     ) {}
 
@@ -79,7 +82,7 @@ final readonly class ResetSettingAction implements ResetSettingContract
                 $tenantId = is_string($setting->tenant_id) ? $setting->tenant_id : null;
                 $ownershipKey = is_string($setting->ownership_key) ? $setting->ownership_key : 'platform';
                 $context = $this->auditContext->current();
-                $event = new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
+                $event = new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext), ownershipEnvelope: OwnershipJobEnvelope::capture($this->ownershipContext));
                 $this->domainEvents->dispatch($event, $connection);
 
                 return $setting;

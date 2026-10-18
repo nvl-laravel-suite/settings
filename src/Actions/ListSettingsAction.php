@@ -16,7 +16,7 @@ use Nvl\Settings\Data\SettingValueData;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 
 /**
  * Returns a deterministic, bounded management page of setting definitions and values.
@@ -30,7 +30,7 @@ final readonly class ListSettingsAction implements ListSettingsContract
      */
     public function __construct(
         private DefinitionRepository $definitions,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**

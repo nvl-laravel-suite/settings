@@ -12,11 +12,14 @@ use Nvl\Settings\Events\SettingChanged;
 use Nvl\Settings\Exceptions\UnknownSettingException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
+use Nvl\Settings\Services\SettingCreator;
 use Nvl\Settings\Services\SettingValueValidator;
 use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Support\Events\DomainEventDispatcher;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 use Nvl\Support\Tenancy\Contracts\TenantContext;
 use Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope;
 
@@ -33,8 +36,10 @@ final class SettingManager implements SettingRepository
         private readonly SettingCache $cache,
         private readonly SettingValueValidator $values,
         private readonly SettingsAuditContextProvider $auditContext,
-        private readonly TenantBoundary $boundary,
+        private readonly OwnershipBoundary $boundary,
+        private readonly SettingCreator $creator,
         private readonly TenantContext $tenantContext,
+        private readonly OwnershipContext $ownershipContext,
         private DomainEventDispatcher $domainEvents,
     ) {}
 
@@ -88,7 +93,7 @@ final class SettingManager implements SettingRepository
         foreach ($values as $fullKey => $settingValue) {
             $definition = $this->definitions->get($fullKey);
             $ownership = $this->boundary->attributes('settings.values');
-            if (isset($ownership['tenant_id']) && ! $definition->tenantOverride) {
+            if ((isset($ownership['tenant_id']) || (isset($ownership['owner_scope_key']) && $ownership['owner_scope_key'] !== 'central')) && ! $definition->tenantOverride) {
                 throw new UnknownSettingException("Setting [$fullKey] does not permit tenant overrides.");
             }
             $this->values->validate($definition, $settingValue, $fullKey);
@@ -120,7 +125,7 @@ final class SettingManager implements SettingRepository
                 $inserted = false;
 
                 if (! $setting instanceof Setting) {
-                    $inserted = Setting::query()->insertOrIgnore([
+                    $inserted = $this->creator->insert([
                         'id' => (string) Str::uuid(),
                         ...$this->boundary->attributes('settings.values'),
                         'namespace' => $definition->namespace,
@@ -180,7 +185,7 @@ final class SettingManager implements SettingRepository
                     $tenantId = is_string($setting->tenant_id) ? $setting->tenant_id : null;
                     $ownershipKey = is_string($setting->ownership_key) ? $setting->ownership_key : 'platform';
                     $context = $this->auditContext->current();
-                    $event = new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
+                    $event = new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext), ownershipEnvelope: OwnershipJobEnvelope::capture($this->ownershipContext));
                     $this->domainEvents->dispatch($event, $connection);
                 }
             }
@@ -222,7 +227,7 @@ final class SettingManager implements SettingRepository
             $revision = $setting->revision;
             $tenantId = is_string($setting->tenant_id) ? $setting->tenant_id : null;
             $ownershipKey = is_string($setting->ownership_key) ? $setting->ownership_key : 'platform';
-            $event = new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext));
+            $event = new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext), ownershipEnvelope: OwnershipJobEnvelope::capture($this->ownershipContext));
             $this->domainEvents->dispatch($event, $connection);
         });
     }

@@ -9,7 +9,8 @@ use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Collection;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Support\Tenancy\Contracts\TenantBoundary;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
+use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
 /**
  * Caches setting records as primitive attributes and invalidates them after commits.
@@ -23,7 +24,7 @@ final readonly class SettingCache
         private Factory $cache,
         private DatabaseManager $database,
         private DefinitionRepository $definitions,
-        private TenantBoundary $boundary,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**
@@ -58,6 +59,9 @@ final readonly class SettingCache
             $setting = new Setting;
             $setting->setRawAttributes($attributes, true);
             $setting->exists = true;
+            if ($setting->getRawOriginal('owner_scope_key') !== null) {
+                $this->boundary->assertRecord($setting, 'settings.values');
+            }
 
             return $setting;
         })->values();
@@ -81,7 +85,14 @@ final readonly class SettingCache
         );
         sort($hashes);
 
-        $ownership = $this->boundary->attributes('settings.values')['ownership_key'] ?? 'disabled';
+        $attributes = $this->boundary->attributes('settings.values');
+        $legacy = $attributes['ownership_key'] ?? 'disabled';
+        if (! is_string($legacy)) {
+            throw new OwnershipViolation('Cache partitions require a canonical string discriminator.');
+        }
+        $ownership = isset($attributes['owner_scope_key'])
+            ? $this->boundary->key('settings.values', 'records')
+            : $legacy;
 
         return $this->makeIdentity($connection->getName() ?? 'default', $ownership, $hashes);
     }
@@ -96,6 +107,13 @@ final readonly class SettingCache
         sort($hashes);
 
         $rawOwnership = $setting->getRawOriginal('ownership_key');
+        $scope = $setting->getRawOriginal('owner_scope_key');
+        if ($scope !== null) {
+            if ($scope !== ($this->boundary->attributes('settings.values')['owner_scope_key'] ?? null)) {
+                throw new OwnershipViolation('Cache invalidation must capture the persisted record partition.');
+            }
+            $rawOwnership = $this->boundary->key('settings.values', 'records');
+        }
 
         return $this->makeIdentity(
             $setting->getConnection()->getName() ?? 'default',
