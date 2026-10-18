@@ -45,6 +45,13 @@ abstract class OwnershipTestCase extends TestCase
             'nvl-settings.discovery.paths' => [__DIR__.'/Fixtures/settings'],
             'nvl-settings.discovery.cache' => false,
         ]);
+        if (getenv('NVL_OWNERSHIP_TEST_DRIVER') === 'pgsql') {
+            $database = getenv('NVL_OWNERSHIP_TEST_DATABASE');
+            if (! is_string($database) || preg_match('/^nvl_own_test_[a-z0-9_]+$/D', $database) !== 1) {
+                throw new \RuntimeException('Native integration tests require a dedicated nvl_own_test_ database.');
+            }
+            $app['config']->set('database.connections.sqlite', ['driver' => 'pgsql', 'url' => null, 'host' => '/tmp', 'port' => '5432', 'database' => $database, 'username' => get_current_user(), 'password' => '', 'charset' => 'utf8', 'prefix' => '', 'search_path' => 'public', 'sslmode' => 'prefer']);
+        }
     }
 
     /** Install real package storage and activate through the reviewed coordinator. */
@@ -52,6 +59,12 @@ abstract class OwnershipTestCase extends TestCase
     {
         parent::setUp();
         $schema = DB::getSchemaBuilder();
+        if (getenv('NVL_OWNERSHIP_TEST_DRIVER') === 'pgsql') {
+            if (DB::connection()->getDatabaseName() !== getenv('NVL_OWNERSHIP_TEST_DATABASE')) {
+                throw new \RuntimeException('The actual native source differs from the dedicated test database.');
+            }
+            $schema->dropAllTables();
+        }
         foreach (['settings_test_companies', 'settings_test_actors'] as $table) {
             $schema->create($table, static fn (Blueprint $table) => $table->unsignedBigInteger('id')->primary());
         }
