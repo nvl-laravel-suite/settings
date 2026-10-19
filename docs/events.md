@@ -53,6 +53,7 @@ Constructor parameters, in native order:
 | `$ownershipKey` | `string` | public | `'platform'` | — |
 | `$envelope` | `?Nvl\Support\Tenancy\ValueObjects\TenantJobEnvelope` | private | `null` | — |
 | `$schemaVersion` | `int` | public | `1` | — |
+| `$ownershipEnvelope` | `?Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope` | private | `null` | — |
 
 Public payload fields:
 

@@ -66,6 +66,13 @@
           "visibility": "public",
           "required": false,
           "default_expression": "1"
+        },
+        {
+          "name": "ownershipEnvelope",
+          "type": "?Nvl\\Support\\Ownership\\ValueObjects\\OwnershipJobEnvelope",
+          "visibility": "private",
+          "required": false,
+          "default_expression": "null"
         }
       ],
       "public_fields": [
