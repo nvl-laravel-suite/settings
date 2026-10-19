@@ -5,6 +5,13 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-10-20
+
+### Changed
+
+- Support native owned values under explicit admission and immutable definition catalogs. Preserve scoped configuration projection and restore host configuration after each boundary.
+- Align required/development NVL peers on `^6.0`, optional peer conflicts on major 6, and `dev-main` on `6.x-dev`. Review [UPGRADING.md](UPGRADING.md) before rollout.
+
 ## [5.0.1] - 2026-10-08
 
 ### Changed

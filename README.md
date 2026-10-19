@@ -3,12 +3,12 @@
 ## Quickstart
 
 ```sh
-composer require nvl/settings:^5.0
+composer require nvl/settings:^6.0
 php artisan nvl:install settings --dry-run
 php artisan nvl:install settings
 ```
 
-Required NVL dependencies: `nvl/core` (`^5.0`). Register the site.title definition in a configured host Settings source before this call. Definition discovery paths are host-selected; no arbitrary filesystem scan is required.
+Required NVL dependencies: `nvl/core` (`^6.0`). Register the site.title definition in a configured host Settings source before this call. Definition discovery paths are host-selected; no arbitrary filesystem scan is required.
 Review the published common config, select one migration owner, and run schema preflight before existing-table upgrades. The installer does not enable features or run migrations. Follow the detailed installation and capability sections below before invoking a storage/provider operation.
 
 Inject `Nvl\Settings\Contracts\GetSettingContract` in a host service. After supplying the trusted inputs described above, the first public call is:
@@ -34,7 +34,7 @@ See the [installation and publishing guide](https://github.com/nvl-laravel-suite
 
 | Item | Value |
 |---|---|
-| Installed through | `composer require nvl/settings:^5.0` |
+| Installed through | `composer require nvl/settings:^6.0` |
 | Module identifier | `nvl/settings` |
 | PHP namespace | `Nvl\Settings` |
 | Service provider | `Nvl\Settings\Providers\SettingsServiceProvider` |
@@ -62,7 +62,7 @@ key/value storage, localized content, tenant ownership, or application UI.
 ## Installation
 
 ```bash
-composer require nvl/settings:^5.0
+composer require nvl/settings:^6.0
 php artisan migrate
 php artisan vendor:publish --tag=nvl-settings-translations
 php artisan vendor:publish --tag=nvl-settings-config
