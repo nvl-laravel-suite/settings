@@ -18,6 +18,18 @@ use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
 
 uses(InteractsWithSettings::class);
 
+it('returns bounded native doctor diagnostics', function (): void {
+    foreach (app(SettingsDoctor::class)->inspect() as $check) {
+        expect($check)->toBeArray()
+            ->toHaveKeys(['key', 'severity', 'passed', 'message'])
+            ->and(array_keys($check))->toBe(['key', 'severity', 'passed', 'message'])
+            ->and($check['key'])->toMatch('/^[a-z][a-z0-9.-]{0,127}$/D')
+            ->and($check['severity'])->toBeIn(['error', 'warning', 'info'])
+            ->and($check['passed'])->toBeBool()
+            ->and(strlen($check['message']))->toBeLessThanOrEqual(2048);
+    }
+});
+
 it('exposes a stable value-free subject reference on setting change events', function (): void {
     $event = new SettingChanged(
         id: 'setting-123',
@@ -225,8 +237,8 @@ it('validates discovery cache and management adoption failures', function (): vo
         $filesystem->put($cache, '<?php return [];');
         app()->forgetInstance(DefinitionRepository::class);
         $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
-        expect($checks['definitions.cache']->passed)->toBeFalse()
-            ->and($checks['definitions.cache']->message)->toContain('stale');
+        expect($checks['definitions.cache']['passed'])->toBeFalse()
+            ->and($checks['definitions.cache']['message'])->toContain('stale');
 
         config()->set('nvl-settings.discovery.cache_path', ['/invalid']);
         app()->forgetInstance(DefinitionRepository::class);
@@ -243,14 +255,14 @@ it('validates discovery cache and management adoption failures', function (): vo
             'nvl-settings.storage.table' => 'missing_consumer_settings',
         ]);
         $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
-        expect($checks['schema.table']->passed)->toBeFalse();
+        expect($checks['schema.table']['passed'])->toBeFalse();
 
         config()->set('nvl-settings.storage.table', 'incomplete_consumer_settings');
         Schema::create('incomplete_consumer_settings', function ($table): void {
             $table->uuid('id')->primary();
         });
         $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
-        expect($checks['schema.columns']->passed)->toBeFalse();
+        expect($checks['schema.columns']['passed'])->toBeFalse();
         Schema::drop('incomplete_consumer_settings');
 
     } finally {

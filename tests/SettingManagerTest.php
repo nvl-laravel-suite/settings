@@ -862,7 +862,7 @@ it('requires exact index uniqueness when diagnosing a consumer table', function 
         $check = collect(app(SettingsDoctor::class)->inspect())
             ->firstWhere('key', 'schema.index.namespace-scope');
 
-        expect($check->passed)->toBeFalse();
+        expect($check['passed'])->toBeFalse();
     } finally {
         $migration->down();
     }
@@ -912,8 +912,8 @@ it('continues identifier diagnostics after encountering an invalid value codec',
     ]);
     $checks = collect(app(SettingsDoctor::class)->inspect());
 
-    expect($checks->firstWhere('key', 'schema.value-codec')->passed)->toBeFalse()
-        ->and($checks->firstWhere('key', 'schema.identifiers')->passed)->toBeFalse();
+    expect($checks->firstWhere('key', 'schema.value-codec')['passed'])->toBeFalse()
+        ->and($checks->firstWhere('key', 'schema.identifiers')['passed'])->toBeFalse();
 });
 
 it('validates configured-table indexes by columns instead of hardcoded names', function (): void {
@@ -926,10 +926,10 @@ it('validates configured-table indexes by columns instead of hardcoded names', f
 
         expect($checks
             ->filter(static fn ($check): bool => str_starts_with(
-                $check->key,
+                $check['key'],
                 'schema.index.',
             ))
-            ->every(static fn ($check): bool => $check->passed))->toBeTrue();
+            ->every(static fn ($check): bool => $check['passed']))->toBeTrue();
     } finally {
         $migration->down();
     }
@@ -937,7 +937,7 @@ it('validates configured-table indexes by columns instead of hardcoded names', f
 
 it('reports a healthy clean-install schema', function (): void {
     expect(collect(app(SettingsDoctor::class)->inspect())->every(
-        static fn ($check): bool => $check->passed,
+        static fn ($check): bool => $check['passed'],
     ))->toBeTrue();
 
     $this->artisan('nvl:settings:doctor', ['--strict' => true, '--format' => 'json'])

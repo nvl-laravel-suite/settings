@@ -8,13 +8,20 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Filesystem\FilesystemServiceProvider;
 use Illuminate\Foundation\Application;
 use Nvl\Settings\Contracts\SettingRepository;
+use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Contracts\SettingsAuthorization;
 use Nvl\Settings\Enums\SettingAbility;
 use Nvl\Settings\Providers\SettingsServiceProvider;
+use Nvl\Settings\Services\PlatformSettingsRuntime;
 use Nvl\Settings\Services\SettingReader;
+use Nvl\Settings\Services\SettingsAdopter;
+use Nvl\Settings\Services\SettingsDoctor;
+use Nvl\Settings\Services\SettingsSourceValidator;
 use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\Tests\TestCase;
+use Nvl\Support\Consumer\PHPStan\ConsumerBoundaryPolicy;
 use Nvl\Support\Enums\SystemActor;
+use PHPStan\Reflection\ReflectionProvider;
 
 uses(TestCase::class);
 
@@ -56,4 +63,46 @@ test('provider registration preserves host authorization bindings in a second ap
         Container::setInstance($this->app);
         $consumer->flush();
     }
+});
+
+test('published consumer catalog admits the native quickstart and a host audit metadata provider', function (): void {
+    $catalog = json_decode(file_get_contents(dirname(__DIR__, 2).'/resources/consumer-api.json'), true, flags: JSON_THROW_ON_ERROR);
+    $symbols = $catalog['symbols'];
+    $required = [
+        SettingRepository::class => ['get', 'has'],
+        SettingReader::class => ['get', 'getMany', 'paginate'],
+        SettingWriter::class => ['set', 'reset', 'sync'],
+        SettingsAuditContextProvider::class => ['metadata'],
+        SettingsSourceValidator::class => ['inspect'],
+        SettingsAdopter::class => ['execute'],
+        SettingsDoctor::class => ['inspect'],
+        PlatformSettingsRuntime::class => ['run'],
+    ];
+    foreach ($required as $symbol => $methods) {
+        expect($symbols)->toHaveKey($symbol);
+        foreach ($methods as $method) {
+            expect($symbols[$symbol]['methods'])->toContain($method);
+        }
+    }
+
+    $policy = new ConsumerBoundaryPolicy(
+        Mockery::mock(ReflectionProvider::class)->shouldIgnoreMissing(),
+        dirname(__DIR__, 5),
+    );
+    foreach ($required as $symbol => $methods) {
+        expect($policy->ownedClass($symbol))->toBe('nvl/settings');
+        foreach ($methods as $method) {
+            expect($policy->allowsMember($symbol, $method, 'method'))->toBeTrue();
+        }
+    }
+
+    $provider = new class implements SettingsAuditContextProvider
+    {
+        public function metadata(): array
+        {
+            return ['request_id' => 'consumer-request'];
+        }
+    };
+    $this->app->instance(SettingsAuditContextProvider::class, $provider);
+    expect($this->app->make(SettingsAuditContextProvider::class))->toBe($provider);
 });

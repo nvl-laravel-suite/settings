@@ -27,7 +27,7 @@ $value = app(SettingRepository::class)->get('site.title');
 $record = app(SettingReader::class)->get('site.title');
 ```
 
-`SettingRepository` and the `Setting` facade are read only runtime access (`get`, `has`). `SettingReader::get` returns the typed `value`, `source` (`definition` or `database`), `type`, `revision`, definition hash, override/orphan flags and validity window. `getMany` accepts a list of at most 500 keys and returns these records in input order with one scoped data query. `paginate` accepts only `namespace`, `scope`, `search`, `page`, and `per_page`; each item has a `definition` and `value` record. Consumers own their HTTP routes, DTOs and Actions.
+`SettingRepository` and the `Setting` facade are read only runtime access (`get`, `has`). `SettingReader::get` returns the typed `value`, `source` (`definition` or `database`), `type`, `revision`, definition hash, override/orphan flags and validity window. A persisted row's type, value and hash remain together until successful definition reconciliation. `getMany` accepts a list of at most 500 keys and returns these records in input order with one scoped data query. `paginate` accepts only `namespace`, `scope`, `search`, `page`, and `per_page`; each item has a `definition` and `value` record. Consumers own their HTTP routes, DTOs and Actions.
 
 ## Management writes
 
@@ -41,9 +41,9 @@ $reset = $writer->reset('site.title', $actor, expectedRevision: $created['revisi
 
 `$actor` is an explicit Laravel `Authenticatable` or `SystemActor`. Host code binds `SettingsAuthorization`, or sets `nvl-settings.management.authorization_ability` for a Gate checked with the supplied authenticated actor. The default binding denies system actors; background writes need an explicit host authorization binding. A system enum value or nullable principal never grants authority by itself.
 
-Existing rows require their exact revision for `set` and `reset`; `null` cannot bypass compare and swap. Revision `0` is the create expectation. Equivalent writes and resets of uncustomized rows produce no event. Setting `valid_from` or `valid_until` to `null` clears that bound, while omitting a bound preserves it. Windows are unavailable for config mapped definitions. The writer validates values, performs the scoped transaction and schedules cache invalidation and value free events after the actual outer commit. A rolled back transaction publishes neither.
+Existing rows require their exact revision for `set` and `reset`; `null` cannot bypass compare and swap. Revision `0` is the create expectation. Equivalent writes and resets of uncustomized rows produce no event. Setting `valid_from` or `valid_until` to `null` clears that bound, while omitting a bound preserves it. Validity instants are stored as UTC seconds, including when input has an offset; an equivalent instant is a no-op. Windows are unavailable for config mapped definitions. The writer validates values, performs the scoped transaction and schedules cache invalidation and value free events after the actual outer commit. A rolled back transaction publishes neither.
 
-`SettingWriter::sync` reconciles source definitions and existing rows without replacing live overrides. It is infrastructure reconciliation, not a management write path. Use `nvl:settings:validate`, `nvl:settings:sync --dry-run`, then `nvl:settings:sync` in deployments. Run `nvl:settings:doctor --strict --format=json` for schema and discovery diagnostics.
+`SettingWriter::sync` reconciles source definitions and existing rows without replacing live overrides. It is infrastructure reconciliation, not a management write path. Use `nvl:settings:validate`, `nvl:settings:sync --dry-run`, then `nvl:settings:sync` in deployments. `SettingsDoctor::inspect()` returns bounded diagnostic arrays (`key`, `severity`, `passed`, `message`); run `nvl:settings:doctor --strict --format=json` for schema and discovery diagnostics.
 
 ## Ownership and platform configuration
 

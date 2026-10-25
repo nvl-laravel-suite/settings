@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\DB;
@@ -120,4 +121,78 @@ it('preserves a live override when synchronizing a changed definition default', 
 
     expect(app(SettingReader::class)->get('catalog.label')['value'])->toBe('Custom')
         ->and(Setting::query()->firstOrFail()->has_override)->toBeTrue();
+});
+
+it('stores validity instants in UTC across object and string inputs without advancing equivalent revisions', function (): void {
+    $this->defineSettings(['catalog.window' => ['type' => SettingType::Text, 'default' => 'Default']]);
+    $actor = settingsTestActor();
+    $writer = app(SettingWriter::class);
+    $previousTimezone = date_default_timezone_get();
+    date_default_timezone_set('America/New_York');
+    try {
+        $created = $writer->set('catalog.window', 'Custom', $actor, 0, [
+            'valid_from' => new DateTimeImmutable('2036-10-25T12:00:00+03:00'),
+            'valid_until' => '2036-10-25T15:00:00+03:00',
+        ]);
+        $record = Setting::query()->firstOrFail();
+        expect($record->getRawOriginal('valid_from'))->toBe('2036-10-25 09:00:00')
+            ->and($record->getRawOriginal('valid_until'))->toBe('2036-10-25 12:00:00')
+            ->and($created['valid_from'])->toBe('2036-10-25T09:00:00+00:00');
+        expect(Setting::query()->firstOrFail()->valid_from?->toAtomString())
+            ->toBe('2036-10-25T09:00:00+00:00');
+
+        Carbon::setTestNow('2036-10-25T08:59:59Z');
+        expect(app(SettingReader::class)->get('catalog.window')['source'])->toBe('definition');
+        Carbon::setTestNow('2036-10-25T09:00:01Z');
+        expect(app(SettingReader::class)->get('catalog.window')['source'])->toBe('database');
+
+        $same = $writer->set('catalog.window', 'Custom', $actor, $created['revision'], [
+            'valid_from' => '2036-10-25T09:00:00Z',
+        ]);
+        expect($same['revision'])->toBe($created['revision']);
+
+        $updated = $writer->set('catalog.window', 'Custom', $actor, $same['revision'], [
+            'valid_from' => '2036-10-25T11:00:00+03:00',
+        ]);
+        expect(Setting::query()->firstOrFail()->getRawOriginal('valid_from'))->toBe('2036-10-25 08:00:00')
+            ->and($updated['valid_from'])->toBe('2036-10-25T08:00:00+00:00')
+            ->and(app(SettingReader::class)->get('catalog.window')['source'])->toBe('database');
+        Carbon::setTestNow('2036-10-25T12:00:01Z');
+        expect(app(SettingReader::class)->get('catalog.window')['source'])->toBe('definition');
+    } finally {
+        Carbon::setTestNow();
+        date_default_timezone_set($previousTimezone);
+    }
+});
+
+it('reports a persisted codec with its persisted value before sync and after a failed type change', function (): void {
+    $definitions = app(DefinitionRepository::class);
+    $definitions->fake([
+        'catalog.first' => ['type' => SettingType::Text, 'default' => 'First'],
+        'catalog.value' => ['type' => SettingType::Text, 'default' => 'Original'],
+    ]);
+    $writer = app(SettingWriter::class);
+    $writer->sync();
+    $writer->set('catalog.value', 'not-an-integer', settingsTestActor(), 1);
+    $storedHash = Setting::query()->where('key', 'value')->firstOrFail()->definition_hash;
+    $firstHash = Setting::query()->where('key', 'first')->firstOrFail()->definition_hash;
+
+    $definitions->fake([
+        'catalog.first' => ['type' => SettingType::Text, 'default' => 'Changed'],
+        'catalog.value' => ['type' => SettingType::Integer, 'default' => 5],
+    ]);
+    $reader = app(SettingReader::class);
+    $before = $reader->get('catalog.value');
+    expect($before['value'])->toBe('not-an-integer')
+        ->and($before['type'])->toBe(SettingType::Text)
+        ->and($before['definition_hash'])->toBe($storedHash);
+
+    expect(fn () => $writer->sync())->toThrow(ValidationException::class);
+    $after = $reader->get('catalog.value');
+    expect($after['value'])->toBe('not-an-integer')
+        ->and($after['type'])->toBe(SettingType::Text)
+        ->and($after['definition_hash'])->toBe($storedHash)
+        ->and(Setting::query()->where('key', 'value')->firstOrFail()->type)->toBe(SettingType::Text)
+        ->and(Setting::query()->where('key', 'first')->firstOrFail()->definition_hash)->toBe($firstHash)
+        ->and($reader->get('catalog.first')['value'])->toBe('First');
 });

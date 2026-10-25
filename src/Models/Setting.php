@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Nvl\Settings\Casts\SettingValueCast;
+use Nvl\Settings\Casts\UtcValidityCast;
 use Nvl\Settings\Database\Factories\SettingFactory;
 use Nvl\Settings\Definitions\Tables\SettingsTables;
 use Nvl\Settings\Enums\SettingType;
@@ -149,8 +150,8 @@ final class Setting extends Model implements Ownable
             'fallback' => SettingValueCast::class,
             'metadata' => 'array',
             'revision' => 'integer',
-            'valid_from' => 'datetime',
-            'valid_until' => 'datetime',
+            'valid_from' => UtcValidityCast::class,
+            'valid_until' => UtcValidityCast::class,
             'synced_at' => 'datetime',
             'orphaned_at' => 'datetime',
         ];

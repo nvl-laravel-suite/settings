@@ -11,11 +11,14 @@ use InvalidArgumentException;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Settings\Support\SettingsDoctorCheck;
 use Throwable;
 
 /**
- * Inspects Settings schema, definitions, caches, and management configuration without mutation.
+ * Inspects Settings schema and definition discovery without mutation.
+ *
+ * @phpstan-type Check array{key: string, severity: 'error'|'warning'|'info', passed: bool, message: string}
+ *
+ * @api
  */
 final readonly class SettingsDoctor
 {
@@ -27,7 +30,7 @@ final readonly class SettingsDoctor
     /**
      * Return every Settings readiness check.
      *
-     * @return list<SettingsDoctorCheck>
+     * @return list<Check>
      */
     public function inspect(): array
     {
@@ -41,7 +44,7 @@ final readonly class SettingsDoctor
     /**
      * Inspect required columns, key type, indexes, and duplicate identities.
      *
-     * @return list<SettingsDoctorCheck>
+     * @return list<Check>
      */
     private function schemaChecks(): array
     {
@@ -52,7 +55,7 @@ final readonly class SettingsDoctor
         try {
             $exists = $schema->hasTable($table);
         } catch (Throwable $exception) {
-            return [new SettingsDoctorCheck(
+            return [$this->check(
                 key: 'schema.connection',
                 severity: 'error',
                 passed: false,
@@ -61,7 +64,7 @@ final readonly class SettingsDoctor
         }
 
         if (! $exists) {
-            return [new SettingsDoctorCheck(
+            return [$this->check(
                 key: 'schema.table',
                 severity: 'error',
                 passed: false,
@@ -83,13 +86,13 @@ final readonly class SettingsDoctor
             static fn (string $column): bool => ! $schema->hasColumn($table, $column),
         ));
         $checks = [
-            new SettingsDoctorCheck(
+            $this->check(
                 key: 'schema.table',
                 severity: 'error',
                 passed: true,
                 message: "Table [{$table}] exists.",
             ),
-            new SettingsDoctorCheck(
+            $this->check(
                 key: 'schema.compatibility',
                 severity: 'error',
                 passed: $missing === [],
@@ -97,7 +100,7 @@ final readonly class SettingsDoctor
                     ? "Table [{$table}] matches the canonical NVL Settings v1 schema."
                     : "Table [{$table}] exists but is not the NVL Settings v1 schema; treat it as a legacy name collision and rename it to a staging table before migration or adoption.",
             ),
-            new SettingsDoctorCheck(
+            $this->check(
                 key: 'schema.columns',
                 severity: 'error',
                 passed: $missing === [],
@@ -112,7 +115,7 @@ final readonly class SettingsDoctor
         }
 
         $idType = $schema->getColumnType($table, 'id');
-        $checks[] = new SettingsDoctorCheck(
+        $checks[] = $this->check(
             key: 'schema.id-type',
             severity: 'error',
             passed: in_array($idType, ['uuid', 'guid', 'char', 'varchar', 'string'], true),
@@ -146,7 +149,7 @@ final readonly class SettingsDoctor
                     === $requirement['columns']
                     && $index['unique'] === $requirement['unique'],
             );
-            $checks[] = new SettingsDoctorCheck(
+            $checks[] = $this->check(
                 key: "schema.index.{$key}",
                 severity: 'error',
                 passed: is_array($index),
@@ -164,7 +167,7 @@ final readonly class SettingsDoctor
             ->groupBy($identityColumns)
             ->havingRaw('COUNT(*) > 1')
             ->exists();
-        $checks[] = new SettingsDoctorCheck(
+        $checks[] = $this->check(
             key: 'schema.duplicate-identities',
             severity: 'error',
             passed: ! $duplicatesExist,
@@ -210,7 +213,7 @@ final readonly class SettingsDoctor
                 }
             }
         }
-        $checks[] = new SettingsDoctorCheck(
+        $checks[] = $this->check(
             key: 'schema.row-integrity',
             severity: 'error',
             passed: ! $invalidRowsExist,
@@ -274,7 +277,7 @@ final readonly class SettingsDoctor
                 $invalidCodec = true;
             }
         }
-        $checks[] = new SettingsDoctorCheck(
+        $checks[] = $this->check(
             key: 'schema.value-codec',
             severity: 'error',
             passed: ! $invalidCodec,
@@ -282,7 +285,7 @@ final readonly class SettingsDoctor
                 ? 'One or more stored values are not canonical for their declared type.'
                 : 'Stored fallbacks and overrides use canonical type encoding.',
         );
-        $checks[] = new SettingsDoctorCheck(
+        $checks[] = $this->check(
             key: 'schema.identifiers',
             severity: 'error',
             passed: ! $invalidIdentifier,
@@ -295,7 +298,7 @@ final readonly class SettingsDoctor
             ->whereNotNull('valid_until')
             ->whereColumn('valid_until', '<=', 'valid_from')
             ->exists();
-        $checks[] = new SettingsDoctorCheck(
+        $checks[] = $this->check(
             key: 'schema.validity-windows',
             severity: 'error',
             passed: ! $invalidWindowsExist,
@@ -309,21 +312,23 @@ final readonly class SettingsDoctor
 
     /**
      * Validate every configured source definition.
+     *
+     * @return Check
      */
-    private function definitionCheck(): SettingsDoctorCheck
+    private function definitionCheck(): array
     {
         try {
             $this->definitions->refresh();
             $count = count($this->definitions->all());
 
-            return new SettingsDoctorCheck(
+            return $this->check(
                 key: 'definitions',
                 severity: 'error',
                 passed: true,
                 message: "{$count} source definitions are valid.",
             );
         } catch (Throwable $exception) {
-            return new SettingsDoctorCheck(
+            return $this->check(
                 key: 'definitions',
                 severity: 'error',
                 passed: false,
@@ -334,11 +339,13 @@ final readonly class SettingsDoctor
 
     /**
      * Validate the optional bootstrap discovery cache.
+     *
+     * @return Check
      */
-    private function discoveryCacheCheck(): SettingsDoctorCheck
+    private function discoveryCacheCheck(): array
     {
         if (! (bool) config('nvl-settings.discovery.cache', true)) {
-            return new SettingsDoctorCheck(
+            return $this->check(
                 key: 'definitions.cache',
                 severity: 'warning',
                 passed: true,
@@ -351,7 +358,7 @@ final readonly class SettingsDoctor
             $fresh = $this->definitions->refresh();
             $runtime = $this->definitions->map();
         } catch (Throwable $exception) {
-            return new SettingsDoctorCheck(
+            return $this->check(
                 key: 'definitions.cache',
                 severity: 'error',
                 passed: false,
@@ -361,7 +368,7 @@ final readonly class SettingsDoctor
 
         $current = $fresh === $runtime;
 
-        return new SettingsDoctorCheck(
+        return $this->check(
             key: 'definitions.cache',
             severity: 'warning',
             passed: (! file_exists($path) || is_readable($path)) && $current,
@@ -371,5 +378,21 @@ final readonly class SettingsDoctor
                     ? "Definition cache [{$path}] is readable and current."
                     : 'Definition cache is not built; discovery will scan configured roots.'),
         );
+    }
+
+    /** @return Check */
+    private function check(string $key, string $severity, bool $passed, string $message): array
+    {
+        if (preg_match('/^[a-z][a-z0-9.-]{0,127}$/D', $key) !== 1
+            || ! in_array($severity, ['error', 'warning', 'info'], true)) {
+            throw new InvalidArgumentException('Settings doctor produced an invalid diagnostic identity.');
+        }
+
+        return [
+            'key' => $key,
+            'severity' => $severity,
+            'passed' => $passed,
+            'message' => mb_strcut($message, 0, 2048, 'UTF-8'),
+        ];
     }
 }

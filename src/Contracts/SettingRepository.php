@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Nvl\Settings\Contracts;
 
-/** Read-only effective values for runtime configuration consumers. */
+/**
+ * Read-only effective values for runtime configuration consumers.
+ *
+ * @api
+ */
 interface SettingRepository
 {
     public function get(string $key): mixed;

@@ -7,7 +7,7 @@ namespace Nvl\Settings\Enums;
 /**
  * Defines how synchronization handles persisted settings removed from source.
  *
- * @internal
+ * @api
  */
 enum SettingPruneStrategy: string
 {

@@ -220,8 +220,8 @@ it('distinguishes a same-name legacy table from the canonical package schema', f
 
     $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
 
-    expect($checks['schema.compatibility']->passed)->toBeFalse()
-        ->and($checks['schema.compatibility']->message)->toContain('legacy name collision');
+    expect($checks['schema.compatibility']['passed'])->toBeFalse()
+        ->and($checks['schema.compatibility']['message'])->toContain('legacy name collision');
 });
 
 it('captures replaceable actor and request context without setting values', function (): void {

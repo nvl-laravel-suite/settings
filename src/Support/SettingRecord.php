@@ -24,7 +24,7 @@ final class SettingRecord
             'key' => self::key($definition),
             'value' => $setting instanceof Setting ? $setting->resolved() : $definition->default,
             'source' => self::source($setting),
-            'type' => $definition->type,
+            'type' => $setting instanceof Setting ? $setting->type : $definition->type,
             'revision' => $setting instanceof Setting ? $setting->revision : 0,
             'definition_hash' => $setting instanceof Setting ? $setting->definition_hash : $definition->hash(),
             'has_override' => $setting?->isCustomised() ?? false,

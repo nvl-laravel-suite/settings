@@ -26,20 +26,15 @@ final class DoctorCommand extends Command
         $checks = $doctor->inspect();
         $strict = (bool) $this->option('strict');
         $failed = collect($checks)->contains(
-            static fn ($check): bool => ! $check->passed
-                && ($strict || $check->severity === 'error'),
+            static fn (array $check): bool => ! $check['passed']
+                && ($strict || $check['severity'] === 'error'),
         );
 
         if ($this->option('format') === 'json') {
             $this->line((string) json_encode([
                 'healthy' => ! $failed,
                 'checks' => array_map(
-                    static fn ($check): array => [
-                        'key' => $check->key,
-                        'severity' => $check->severity,
-                        'passed' => $check->passed,
-                        'message' => $check->message,
-                    ],
+                    static fn (array $check): array => $check,
                     $checks,
                 ),
             ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
@@ -47,9 +42,9 @@ final class DoctorCommand extends Command
             foreach ($checks as $check) {
                 $this->line(sprintf(
                     '[%s] %s: %s',
-                    $check->passed ? 'PASS' : strtoupper($check->severity),
-                    $check->key,
-                    $check->message,
+                    $check['passed'] ? 'PASS' : strtoupper($check['severity']),
+                    $check['key'],
+                    $check['message'],
                 ));
             }
         }

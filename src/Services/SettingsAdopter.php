@@ -17,7 +17,7 @@ use RuntimeException;
 /**
  * Plans and applies a reconciled import from one staged legacy settings table.
  *
- * @internal
+ * @api
  */
 final readonly class SettingsAdopter
 {

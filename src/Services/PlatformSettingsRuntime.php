@@ -8,7 +8,11 @@ use Closure;
 use Illuminate\Contracts\Config\Repository;
 use Throwable;
 
-/** Projects opted-in platform overrides for one request or job and restores its original configuration. */
+/**
+ * Projects opted-in platform overrides for one request or job and restores its original configuration.
+ *
+ * @api
+ */
 final class PlatformSettingsRuntime
 {
     /** @var list<array<string, mixed>|null> */

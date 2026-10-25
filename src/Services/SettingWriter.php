@@ -36,12 +36,12 @@ use Nvl\Support\Ownership\Contracts\OwnershipContext;
 use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 
 /**
- * Aligns persisted settings with source definitions without replacing live overrides.
+ * Owns authorized setting mutations and definition reconciliation.
  *
  * This service owns the transaction because definition alignment, override validation,
  * pruning, and cache invalidation form one reusable atomic write boundary.
  *
- * @internal
+ * @api
  */
 final readonly class SettingWriter
 {
@@ -126,8 +126,8 @@ final readonly class SettingWriter
                     'metadata' => json_encode($definition->metadata, JSON_THROW_ON_ERROR),
                     'definition_hash' => $definition->hash(),
                     'revision' => 1,
-                    'valid_from' => $validFrom,
-                    'valid_until' => $validUntil,
+                    'valid_from' => $validFrom?->format('Y-m-d H:i:s'),
+                    'valid_until' => $validUntil?->format('Y-m-d H:i:s'),
                     'synced_at' => $now,
                     'orphaned_at' => null,
                     'created_at' => $now,
@@ -482,7 +482,7 @@ final readonly class SettingWriter
             throw ValidationException::withMessages([$attribute => ['Validity timestamps require whole-second precision.']]);
         }
 
-        return $parsed;
+        return $parsed->setTimezone('UTC');
     }
 
     private function validateWindow(?CarbonInterface $validFrom, ?CarbonInterface $validUntil): void

@@ -9,10 +9,10 @@ Use source controlled `*.settings.php` or `*.settings.json` definitions. Configu
 
 ## Services
 
-- Inject `SettingReader` for `get`, `getMany` (at most 500 keys) and `paginate` (allowlisted filters). Results include effective value, source and revision metadata. `SettingRepository` and the `Setting` facade are read only runtime `get`/`has` access.
+- Inject `SettingReader` for `get`, `getMany` (at most 500 keys) and `paginate` (allowlisted filters). Results include effective value, source and revision metadata. Persisted rows report the persisted codec type with their value and hash until successful definition sync. `SettingRepository` and the `Setting` facade are read only runtime `get`/`has` access.
 - Inject `SettingWriter` for `set` and `reset`. Supply an actual `Authenticatable` or `SystemActor`, plus the exact expected revision for existing rows. Use `0` for a first write. `null` cannot bypass an existing row's revision.
 - Bind `SettingsAuthorization` in the host or configure the Gate ability for human actors. The default checks the supplied actor through `Gate::forUser` and denies system actors. A background actor needs an explicit host policy binding.
-- Pass `valid_from`/`valid_until` only when changing a window. Omission preserves a bound; explicit `null` clears it. Config mapped definitions cannot have scheduled windows.
+- Pass `valid_from`/`valid_until` only when changing a window. Omission preserves a bound; explicit `null` clears it. Validity offsets are normalized to UTC seconds before storage, and equivalent instants are no-op writes. Config mapped definitions cannot have scheduled windows.
 - Let `SettingWriter::sync` reconcile definitions and preserve live overrides. It is infrastructure reconciliation, not an unversioned management writer.
 - Treat canonically equivalent writes and absent resets as no ops. Events and cache invalidation occur after the actual outer source connection commit; a rollback discards both.
 
@@ -24,6 +24,6 @@ Native Ownership is optional. In an enabled installation, admit the intended own
 
 Consumers own DTOs, Actions, controllers, routes, middleware and HTTP responses. Settings does not register an HTTP surface. Package events contain scalar identity, key, revision, operation, an explicit principal derived audit context and native ownership capture. The default audit metadata provider does not inspect Request/Auth; hosts may bind a bounded request metadata provider.
 
-Run `nvl:settings:validate`, `nvl:settings:sync --dry-run`, `nvl:settings:sync` and `nvl:settings:doctor --strict --format=json`. For staged imports, a version 1 manifest lists explicit key replacements and `expected_revisions` for every target; `--apply` requires a host binding authorizing `SystemActor::Background`. Import writes and reconciliation share one target transaction and roll back together.
+Run `nvl:settings:validate`, `nvl:settings:sync --dry-run`, `nvl:settings:sync` and `nvl:settings:doctor --strict --format=json`. `SettingsDoctor::inspect()` returns bounded diagnostic arrays with `key`, `severity`, `passed` and `message`. For staged imports, a version 1 manifest lists explicit key replacements and `expected_revisions` for every target; `--apply` requires a host binding authorizing `SystemActor::Background`. Import writes and reconciliation share one target transaction and roll back together.
 
 Test native service behavior with real schema, exact revisions, cache, outer rollback, ownership admission, config restoration, and consumer HTTP mapping. See the package [README](../../../../README.md), [upgrade guide](../../../../UPGRADING.md), and [event schema](../../../../docs/events.md).

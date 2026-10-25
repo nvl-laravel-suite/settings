@@ -6,6 +6,25 @@
         "Nvl\\Settings\\Database\\Factories\\": "database/factories"
     },
     "symbols": {
+        "Nvl\\Settings\\Contracts\\SettingRepository": {
+            "kind": "interface",
+            "file": "src/Contracts/SettingRepository.php",
+            "methods": [
+                "get",
+                "has"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Contracts\\SettingsAuditContextProvider": {
+            "kind": "interface",
+            "file": "src/Contracts/SettingsAuditContextProvider.php",
+            "methods": [
+                "metadata"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Settings\\Contracts\\SettingsAuthorization": {
             "kind": "interface",
             "file": "src/Contracts/SettingsAuthorization.php",
@@ -42,6 +61,24 @@
                 "Set",
                 "Status",
                 "View"
+            ]
+        },
+        "Nvl\\Settings\\Enums\\SettingPruneStrategy": {
+            "kind": "enum",
+            "file": "src/Enums/SettingPruneStrategy.php",
+            "methods": [
+                "cases",
+                "from",
+                "tryFrom"
+            ],
+            "properties": [
+                "name",
+                "value"
+            ],
+            "constants": [
+                "Delete",
+                "Ignore",
+                "Orphan"
             ]
         },
         "Nvl\\Settings\\Enums\\SettingType": {
@@ -239,6 +276,62 @@
                 "maximum",
                 "minimum"
             ],
+            "constants": []
+        },
+        "Nvl\\Settings\\Services\\PlatformSettingsRuntime": {
+            "kind": "class",
+            "file": "src/Services/PlatformSettingsRuntime.php",
+            "methods": [
+                "__construct",
+                "apply",
+                "restore",
+                "run"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Services\\SettingReader": {
+            "kind": "class",
+            "file": "src/Services/SettingReader.php",
+            "methods": [
+                "__construct",
+                "get",
+                "getMany",
+                "paginate"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Services\\SettingWriter": {
+            "kind": "class",
+            "file": "src/Services/SettingWriter.php",
+            "methods": [
+                "__construct",
+                "reset",
+                "set",
+                "sync"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Services\\SettingsAdopter": {
+            "kind": "class",
+            "file": "src/Services/SettingsAdopter.php",
+            "methods": [
+                "__construct",
+                "execute"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Services\\SettingsDoctor": {
+            "kind": "class",
+            "file": "src/Services/SettingsDoctor.php",
+            "methods": [
+                "__construct",
+                "inspect"
+            ],
+            "properties": [],
             "constants": []
         },
         "Nvl\\Settings\\Services\\SettingsSourceValidator": {

@@ -18,6 +18,8 @@ use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 /**
  * Resolves defined settings and bounded management pages inside the admitted ownership scope.
  *
+ * @api
+ *
  * @phpstan-import-type Resolved from SettingRecord
  * @phpstan-import-type DefinitionRecord from SettingRecord
  */
