@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\GenericUser;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
@@ -9,20 +12,21 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Nvl\Settings\Actions\AdoptSettingsAction;
-use Nvl\Settings\Actions\SetSettingAction;
 use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Contracts\SettingsAuditContextProvider;
-use Nvl\Settings\Data\SettingAuditContextData;
-use Nvl\Settings\Data\SettingMutationData;
+use Nvl\Settings\Contracts\SettingsAuthorization;
 use Nvl\Settings\Definitions\Tables\SettingsTables;
+use Nvl\Settings\Enums\SettingAbility;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Events\SettingChanged;
+use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
+use Nvl\Settings\Services\SettingsAdopter;
 use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Settings\Testing\InteractsWithSettings;
+use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
 use Nvl\Settings\Tests\TestCase;
+use Nvl\Support\Enums\SystemActor;
 
 uses(InteractsWithSettings::class);
 
@@ -63,8 +67,9 @@ it('plans applies and reconciles an explicit legacy key replacement manifest', f
             'core.currency.dual_pricing.enabled' => 'core.dual_pricing_enabled',
             'notifications.reminders.minutes' => 'notifications.reminder_minutes',
         ],
+        'expected_revisions' => ['core.dual_pricing_enabled' => 0, 'notifications.reminder_minutes' => 0],
     ];
-    $action = app(AdoptSettingsAction::class);
+    $action = app(SettingsAdopter::class);
 
     $plan = $action->execute($manifest);
 
@@ -80,13 +85,14 @@ it('plans applies and reconciles an explicit legacy key replacement manifest', f
         ])
         ->and(Setting::query()->count())->toBe(0);
 
-    $applied = $action->execute($manifest, apply: true);
+    $applied = $action->execute($manifest, apply: true, actor: settingsTestActor());
 
     expect($applied['reconciliation']['matched'])->toBe(2)
         ->and(Setting::query()->where('key', 'dual_pricing_enabled')->firstOrFail()->value)->toBeTrue()
         ->and(Setting::query()->where('key', 'reminder_minutes')->firstOrFail()->value)->toBe([5, 15]);
 
-    $repeated = $action->execute($manifest, apply: true);
+    $manifest['expected_revisions'] = ['core.dual_pricing_enabled' => 1, 'notifications.reminder_minutes' => 1];
+    $repeated = $action->execute($manifest, apply: true, actor: settingsTestActor());
 
     expect($repeated['reconciliation']['created'])->toBe(0)
         ->and($repeated['reconciliation']['updated'])->toBe(0)
@@ -111,7 +117,18 @@ it('runs the adoption command as a non-mutating dry run by default', function ()
         'source_table' => 'legacy_settings',
         'expected_count' => 1,
         'key_replacements' => ['core.flags.enabled' => 'core.enabled'],
+        'expected_revisions' => ['core.enabled' => 0],
     ], JSON_THROW_ON_ERROR));
+
+    app()->instance(SettingsAuthorization::class, new class implements SettingsAuthorization
+    {
+        public function authorize(Authenticatable|SystemActor $actor, SettingAbility $ability, ?string $key = null): void
+        {
+            if ($actor !== SystemActor::Background || $ability !== SettingAbility::Set) {
+                throw new AuthorizationException;
+            }
+        }
+    });
 
     try {
         $this->artisan('nvl:settings:adopt', ['manifest' => $path])
@@ -131,6 +148,37 @@ it('runs the adoption command as a non-mutating dry run by default', function ()
     }
 });
 
+it('rolls back every staged write when a later target has a stale expected revision', function (): void {
+    /** @var TestCase $this */
+    $this->defineSettings([
+        'core.first' => ['type' => SettingType::Boolean, 'default' => false],
+        'core.second' => ['type' => SettingType::Boolean, 'default' => false],
+    ]);
+    Schema::create('legacy_settings', function (Blueprint $table): void {
+        $table->string('key')->primary();
+        $table->text('value');
+    });
+    DB::table('legacy_settings')->insert([
+        ['key' => 'first.old', 'value' => '1'],
+        ['key' => 'second.old', 'value' => '1'],
+    ]);
+    settingsSetForTest('core.second', false, 0);
+
+    $manifest = [
+        'version' => 1,
+        'source_table' => 'legacy_settings',
+        'expected_count' => 2,
+        'key_replacements' => ['first.old' => 'core.first', 'second.old' => 'core.second'],
+        'expected_revisions' => ['core.first' => 0, 'core.second' => 0],
+    ];
+
+    expect(fn () => app(SettingsAdopter::class)->execute($manifest, apply: true, actor: settingsTestActor()))
+        ->toThrow(StaleSettingVersionException::class)
+        ->and(Setting::query()->count())->toBe(1)
+        ->and(Setting::query()->firstOrFail()->key)->toBe('second')
+        ->and(Setting::query()->firstOrFail()->revision)->toBe(1);
+});
+
 it('fails loudly for incomplete maps counts and same-name legacy collisions', function (): void {
     /** @var TestCase $this */
     $this->defineSettings([
@@ -141,7 +189,7 @@ it('fails loudly for incomplete maps counts and same-name legacy collisions', fu
         $table->text('value');
     });
     DB::table('legacy_settings')->insert(['key' => 'unknown.legacy.key', 'value' => '1']);
-    $action = app(AdoptSettingsAction::class);
+    $action = app(SettingsAdopter::class);
 
     expect(fn () => $action->execute([
         'version' => 1,
@@ -183,29 +231,23 @@ it('captures replaceable actor and request context without setting values', func
     ]);
     app()->instance(SettingsAuditContextProvider::class, new class implements SettingsAuditContextProvider
     {
-        public function current(): SettingAuditContextData
+        public function metadata(): array
         {
-            return new SettingAuditContextData(
-                actorType: 'users',
-                actorId: 'actor-1',
-                requestId: 'request-1',
-                ipAddress: '127.0.0.1',
-                userAgent: 'Settings test',
-            );
+            return ['request_id' => 'request-1', 'ip_address' => '127.0.0.1', 'user_agent' => 'Settings test'];
         }
     });
     Event::fake([SettingChanged::class]);
 
-    app(SetSettingAction::class)->execute(new SettingMutationData(
+    settingsSetForTest(
         key: 'core.enabled',
         value: true,
         expectedRevision: 0,
-    ));
+    );
 
     Event::assertDispatched(
         SettingChanged::class,
-        static fn (SettingChanged $event): bool => $event->context->actorType === 'users'
-            && $event->context->actorId === 'actor-1'
+        static fn (SettingChanged $event): bool => $event->context->actorType === GenericUser::class
+            && $event->context->actorId === 'user-1'
             && $event->context->requestId === 'request-1'
             && ! property_exists($event, 'value'),
     );
@@ -241,9 +283,9 @@ it('validates typed JSON lists and maps from portable source rules', function ()
         expect($definitions)->toHaveKeys(['structured.schedule', 'structured.limits']);
 
         $repository = app(SettingRepository::class);
-        expect(fn () => $repository->set('structured.schedule', [0, 15]))
+        expect(fn () => settingsSetForTest('structured.schedule', [0, 15]))
             ->toThrow(ValidationException::class)
-            ->and(fn () => $repository->set('structured.limits', ['small' => '10']))
+            ->and(fn () => settingsSetForTest('structured.limits', ['small' => '10']))
             ->toThrow(ValidationException::class);
     } finally {
         $filesystem->deleteDirectory($directory);

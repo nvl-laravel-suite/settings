@@ -5,41 +5,23 @@ declare(strict_types=1);
 namespace Nvl\Settings\Providers;
 
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Contracts\Queue\Job;
-use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Queue\Events\JobAttempted;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
-use Nvl\Data\Services\TypeScriptSourceRegistry;
 use Nvl\Ownership\Services\OwnershipAdoptionRegistry;
-use Nvl\Settings\Actions\GetManySettingsAction;
-use Nvl\Settings\Actions\GetSettingAction;
-use Nvl\Settings\Actions\ListSettingsAction;
-use Nvl\Settings\Actions\ResetSettingAction;
-use Nvl\Settings\Actions\SetSettingAction;
-use Nvl\Settings\Actions\ValidateSettingsSourcesAction;
-use Nvl\Settings\Adapters\Laravel\LaravelSettingsAuditContextProvider;
 use Nvl\Settings\Commands\AdoptCommand;
 use Nvl\Settings\Commands\CacheCommand;
 use Nvl\Settings\Commands\ClearCommand;
 use Nvl\Settings\Commands\DoctorCommand;
 use Nvl\Settings\Commands\ListCommand;
-use Nvl\Settings\Commands\ResetCommand;
 use Nvl\Settings\Commands\SyncCommand;
 use Nvl\Settings\Commands\ValidateCommand;
-use Nvl\Settings\Contracts\GetManySettingsContract;
-use Nvl\Settings\Contracts\GetSettingContract;
-use Nvl\Settings\Contracts\ListSettingsContract;
-use Nvl\Settings\Contracts\ResetSettingContract;
-use Nvl\Settings\Contracts\SetSettingContract;
 use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Contracts\SettingsAuthorization;
-use Nvl\Settings\Contracts\ValidateSettingsSourcesContract;
-use Nvl\Settings\Http\Middleware\ApplyPlatformSettingsOverrides;
 use Nvl\Settings\Models\Setting as SettingModel;
 use Nvl\Settings\Observers\SettingCacheObserver;
 use Nvl\Settings\Ownership\SettingsAdoptionAdapter as OwnershipAdopter;
@@ -47,26 +29,25 @@ use Nvl\Settings\Ownership\SettingsContextParticipant;
 use Nvl\Settings\Ownership\SettingsResourceRegistrar as OwnershipRegistrar;
 use Nvl\Settings\Services\ConfigOverrideApplier;
 use Nvl\Settings\Services\ConfiguredSettingsAuthorization;
+use Nvl\Settings\Services\EmptySettingsAuditContextProvider;
 use Nvl\Settings\Services\PlatformConfigWriter;
 use Nvl\Settings\Services\PlatformSettingsBootstrap;
 use Nvl\Settings\Services\PlatformSettingsReader;
 use Nvl\Settings\Services\PlatformSettingsRuntime;
 use Nvl\Settings\Services\SettingCache;
+use Nvl\Settings\Services\SettingReader;
 use Nvl\Settings\Services\SettingsDoctor;
+use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\SettingManager;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingsRules;
-use Nvl\Settings\Tenancy\SettingsResourceRegistrar;
 use Nvl\Support\Doctor\PackageDoctorContributor;
 use Nvl\Support\Globals\GlobalNames;
 use Nvl\Support\Ownership\Contracts\OwnershipIntegratedProvider;
 use Nvl\Support\Ownership\Services\OwnershipContextParticipants;
 use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
-use Nvl\Support\Providers\TenantServiceProvider;
-use Nvl\Support\Tenancy\Services\TenantResourceRegistry;
 use Nvl\Support\Traits\MergesPackageConfiguration;
 use Nvl\Support\Traits\RegistersNamespacedResources;
-use Nvl\Tenancy\Services\TenantAdoptionRegistry;
 use WeakMap;
 
 /**
@@ -82,24 +63,12 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
      */
     public function register(): void
     {
-        $this->app->bindIf(GetManySettingsContract::class, GetManySettingsAction::class);
-        $this->app->bindIf(GetSettingContract::class, GetSettingAction::class);
-        $this->app->bindIf(ListSettingsContract::class, ListSettingsAction::class);
-        $this->app->bindIf(ResetSettingContract::class, ResetSettingAction::class);
-        $this->app->bindIf(SetSettingContract::class, SetSettingAction::class);
-        $this->app->bindIf(ValidateSettingsSourcesContract::class, ValidateSettingsSourcesAction::class);
-
         PackageDoctorContributor::register($this->app, 'nvl/settings', fn (): array => $this->app->make(SettingsDoctor::class)->inspect());
 
-        $this->app->register(TenantServiceProvider::class);
         $this->mergePackageConfiguration(__DIR__.'/../../config/nvl-settings.php', 'settings');
-        (new SettingsResourceRegistrar)->register($this->app->make(TenantResourceRegistry::class));
         $this->app->booted(function (): void {
             if ($this->app->bound(OwnershipAdoptionRegistry::class)) {
                 $this->app->make(OwnershipAdoptionRegistry::class)->register('settings', OwnershipAdopter::class);
-            }
-            if ($this->app->bound(TenantAdoptionRegistry::class)) {
-                (new SettingsResourceRegistrar)->register($this->app->make(TenantResourceRegistry::class), $this->app->make(TenantAdoptionRegistry::class));
             }
         });
 
@@ -110,6 +79,8 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
         $this->app->scoped(PlatformSettingsRuntime::class);
         $this->app->scoped(PlatformSettingsBootstrap::class);
         $this->app->scoped(ConfigOverrideApplier::class);
+        $this->app->scoped(SettingReader::class);
+        $this->app->scoped(SettingWriter::class);
         $this->app->scopedIf(SettingRepository::class, SettingManager::class);
         $names = $this->app->make(GlobalNames::class);
         $exists = fn (string $name): bool => $this->app->bound($name);
@@ -119,14 +90,14 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
         $this->app->bindIf(SettingsAuthorization::class, ConfiguredSettingsAuthorization::class);
         $this->app->bindIf(
             SettingsAuditContextProvider::class,
-            LaravelSettingsAuditContextProvider::class,
+            EmptySettingsAuditContextProvider::class,
         );
     }
 
     /**
      * Publish resources, register commands, and attach cache invalidation hooks.
      */
-    public function boot(TypeScriptSourceRegistry $typeScriptSources): void
+    public function boot(): void
     {
         (new OwnershipRegistrar)->register($this->app->make(OwnershipResourceRegistry::class), $this->app->make('config')->get('nvl-ownership.enabled') === true);
         $this->app->make(OwnershipContextParticipants::class)->register(SettingsContextParticipant::class);
@@ -134,7 +105,6 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
         $this->publishes([
             __DIR__.'/../../lang' => lang_path('vendor/nvl-settings'),
         ], 'nvl-settings-translations');
-        $typeScriptSources->register(__DIR__.'/..', 'nvl/settings');
         $this->publishes([
             __DIR__.'/../../config/nvl-settings.php' => config_path('nvl-settings.php'),
         ], 'settings-config');
@@ -145,10 +115,6 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
         if ((bool) config('nvl-settings.migrations.enabled', true)) {
             $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
         }
-        if ((bool) config('nvl-settings.management.enabled', false)) {
-            $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
-        }
-
         $this->publishes([
             __DIR__.'/../../resources/boost/skills' => base_path('.agents/skills'),
         ], 'settings-skills');
@@ -157,7 +123,6 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
             $this->commands([
                 AdoptCommand::class,
                 SyncCommand::class,
-                ResetCommand::class,
                 CacheCommand::class,
                 ClearCommand::class,
                 ListCommand::class,
@@ -230,11 +195,6 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
             return;
         }
 
-        $this->callAfterResolving(Kernel::class, static function (Kernel $kernel): void {
-            if ($kernel instanceof HttpKernel) {
-                $kernel->pushMiddleware(ApplyPlatformSettingsOverrides::class);
-            }
-        });
         $events = $this->app->make(Dispatcher::class);
         /** @var WeakMap<Job, PlatformSettingsRuntime> $runtimes */
         $runtimes = new WeakMap;

@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Nvl\Settings\Actions;
+namespace Nvl\Settings\Services;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
-use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Models\Setting;
-use Nvl\Settings\Services\SettingsAdoptionManifest;
-use Nvl\Settings\Services\SettingValueValidator;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Support\Enums\SystemActor;
+use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use RuntimeException;
 
 /**
@@ -19,7 +19,7 @@ use RuntimeException;
  *
  * @internal
  */
-final readonly class AdoptSettingsAction
+final readonly class SettingsAdopter
 {
     /**
      * Create the Settings adoption action.
@@ -28,7 +28,8 @@ final readonly class AdoptSettingsAction
         private SettingsAdoptionManifest $manifests,
         private DefinitionRepository $definitions,
         private SettingValueValidator $values,
-        private SettingRepository $settings,
+        private SettingWriter $writer,
+        private OwnershipBoundary $boundary,
     ) {}
 
     /**
@@ -37,7 +38,7 @@ final readonly class AdoptSettingsAction
      * @param  array<array-key, mixed>  $manifest
      * @return array{mode: string, source_table: string, reconciliation: array{expected: int, source: int, mapped: int, matched: int, created: int, updated: int, unchanged: int}}
      */
-    public function execute(array $manifest, bool $apply = false): array
+    public function execute(array $manifest, bool $apply = false, Authenticatable|SystemActor|null $actor = null): array
     {
         $normalized = $this->manifests->normalize($manifest);
         $connection = $normalized['source_connection'];
@@ -118,14 +119,22 @@ final readonly class AdoptSettingsAction
 
         if ($apply) {
             $this->assertCanonicalSchema();
-            $this->settings->setMany($prepared);
-            $matched = $this->reconcile($prepared);
-
-            if ($matched !== count($prepared)) {
-                throw new RuntimeException(
-                    "Settings adoption reconciliation matched {$matched} of ".count($prepared).' target rows.',
-                );
+            if ($actor === null || count($normalized['expected_revisions']) !== count($prepared)
+                || array_diff(array_keys($prepared), array_keys($normalized['expected_revisions'])) !== []) {
+                throw new InvalidArgumentException('Settings adoption apply requires an explicit actor and expected revision for every mapped target.');
             }
+            $target = new Setting;
+            $matched = $target->getConnection()->transaction(function () use ($actor, $normalized, $prepared): int {
+                foreach ($prepared as $targetKey => $value) {
+                    $this->writer->set($targetKey, $value, $actor, $normalized['expected_revisions'][$targetKey]);
+                }
+                $matched = $this->reconcile($prepared);
+                if ($matched !== count($prepared)) {
+                    throw new RuntimeException("Settings adoption reconciliation matched {$matched} of ".count($prepared).' target rows.');
+                }
+
+                return $matched;
+            });
         } else {
             $matched = 0;
         }
@@ -159,7 +168,7 @@ final readonly class AdoptSettingsAction
 
         foreach ($prepared as $targetKey => $value) {
             $definition = $this->definitions->get($targetKey);
-            $record = Setting::query()->where([
+            $record = $this->boundary->query(Setting::query(), 'settings.values')->where([
                 'namespace' => $definition->namespace,
                 'scope' => $definition->scope,
                 'key' => $definition->key,
@@ -223,7 +232,7 @@ final readonly class AdoptSettingsAction
 
         foreach ($prepared as $targetKey => $value) {
             $definition = $this->definitions->get($targetKey);
-            $record = Setting::query()->where([
+            $record = $this->boundary->query(Setting::query(), 'settings.values')->where([
                 'namespace' => $definition->namespace,
                 'scope' => $definition->scope,
                 'key' => $definition->key,

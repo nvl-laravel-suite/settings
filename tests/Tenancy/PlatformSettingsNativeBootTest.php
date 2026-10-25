@@ -9,14 +9,11 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
-use Nvl\Data\Providers\DataServiceProvider;
-use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Providers\SettingsServiceProvider;
 use Nvl\Settings\Services\PlatformSettingsRuntime;
 use Nvl\Settings\Tests\PlatformSettingsBootTestCase;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Nvl\Support\Providers\SupportServiceProvider;
-use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Symfony\Component\Console\Output\BufferedOutput;
 
 uses(PlatformSettingsBootTestCase::class);
@@ -37,7 +34,7 @@ final class SettingsNativeBootDatabaseProbeProvider extends ServiceProvider
 }
 
 test('native discovery and configuration cache never read enabled override storage', function (bool $unavailable): void {
-    app(SettingRepository::class)->set('branding.name', 'Database-only branding sentinel');
+    settingsSetForTest('branding.name', 'Database-only branding sentinel');
     $files = new Filesystem;
     $path = sys_get_temp_dir().'/nvl-settings-native-boot-'.Str::uuid();
     foreach (['app', 'bootstrap/cache', 'config', 'storage/framework/cache/data', 'storage/framework/views', 'storage/logs'] as $directory) {
@@ -47,8 +44,6 @@ test('native discovery and configuration cache never read enabled override stora
         SettingsNativeBootDatabaseProbeProvider::class,
         SupportServiceProvider::class,
         LocaleServiceProvider::class,
-        DataServiceProvider::class,
-        TenancyServiceProvider::class,
         SettingsServiceProvider::class,
     ];
     $files->put($path.'/bootstrap/app.php', '<?php return \\Illuminate\\Foundation\\Application::configure(basePath: '.var_export($path, true).')->withProviders('.var_export($providers, true).', withBootstrapProviders: false)->create();');
@@ -69,7 +64,6 @@ test('native discovery and configuration cache never read enabled override stora
             'cache' => ['enabled' => false],
             'overrides' => ['enabled' => true],
         ],
-        'nvl-tenancy' => ['enabled' => true, 'migrations' => ['enabled' => false]],
     ];
     foreach ($configuration as $name => $values) {
         $files->put($path.'/config/'.$name.'.php', '<?php return '.var_export($values, true).';');

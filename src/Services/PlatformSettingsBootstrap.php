@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Settings\Services;
 
 use Illuminate\Contracts\Foundation\Application;
-use Nvl\Support\Tenancy\Exceptions\TenantBoundaryViolation;
+use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
 /**
  * Applies platform configuration only during Laravel application bootstrap.
@@ -26,12 +26,12 @@ final readonly class PlatformSettingsBootstrap
     /**
      * Apply available platform settings before the application finishes booting.
      *
-     * @throws TenantBoundaryViolation When invoked after application bootstrap
+     * @throws OwnershipViolation When invoked after application bootstrap
      */
     public function apply(): void
     {
         if ($this->app->isBooted()) {
-            throw new TenantBoundaryViolation('Platform configuration bootstrap has ended.');
+            throw new OwnershipViolation('Platform configuration bootstrap has ended.');
         }
 
         if (! (bool) config('nvl-settings.overrides.enabled', false)

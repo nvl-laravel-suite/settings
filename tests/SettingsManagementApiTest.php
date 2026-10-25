@@ -2,21 +2,31 @@
 
 declare(strict_types=1);
 
+use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Settings\Tests\Fixtures\SettingsManagementController;
+
+/** Register consumer-owned management routes only for this transport fixture. */
+function registerSettingsManagementFixtureRoutes(): void
+{
+    Route::prefix('api/internal/runtime-settings')->name('runtime.settings.')->group(static function (): void {
+        Route::get('/status', [SettingsManagementController::class, 'status'])->name('status');
+        Route::get('/', [SettingsManagementController::class, 'index'])->name('index');
+        Route::get('/{key}', [SettingsManagementController::class, 'show'])->name('show');
+        Route::put('/{key}', [SettingsManagementController::class, 'update'])->name('update');
+        Route::delete('/{key}', [SettingsManagementController::class, 'reset'])->name('reset');
+    });
+}
 
 test('management routes are disabled by default', function (): void {
     expect(Route::has('nvl.settings.management.index'))->toBeFalse();
 });
 
 test('enabled management routes authorize typed reads and optimistic writes', function (): void {
-    config()->set('nvl-settings.management.enabled', true);
-    config()->set('nvl-settings.management.path', 'api/internal/runtime-settings');
-    config()->set('nvl-settings.management.name', 'runtime.settings');
-    config()->set('nvl-settings.management.middleware', []);
     config()->set('nvl-settings.management.authorization_ability', 'manage-settings');
     Gate::define(
         'manage-settings',
@@ -26,7 +36,8 @@ test('enabled management routes authorize typed reads and optimistic writes', fu
             true,
         ),
     );
-    require __DIR__.'/../routes/api.php';
+    registerSettingsManagementFixtureRoutes();
+    $this->actingAs(new GenericUser(['id' => 'user-1']));
     app('router')->getRoutes()->refreshNameLookups();
 
     expect(Route::has('runtime.settings.status'))->toBeTrue()
@@ -69,16 +80,13 @@ test('enabled management routes authorize typed reads and optimistic writes', fu
 });
 
 test('management listing remains bounded with large definition sets', function (): void {
-    config()->set('nvl-settings.management.enabled', true);
-    config()->set('nvl-settings.management.path', 'api/internal/runtime-settings');
-    config()->set('nvl-settings.management.name', 'runtime.settings');
-    config()->set('nvl-settings.management.middleware', []);
     config()->set('nvl-settings.management.authorization_ability', 'manage-settings');
     Gate::define(
         'manage-settings',
         static fn (?Authenticatable $actor, string $ability): bool => $ability === 'list',
     );
-    require __DIR__.'/../routes/api.php';
+    registerSettingsManagementFixtureRoutes();
+    $this->actingAs(new GenericUser(['id' => 'user-1']));
 
     $definitions = [];
 
@@ -100,10 +108,6 @@ test('management listing remains bounded with large definition sets', function (
 });
 
 test('management routes return stable unknown and stale error contracts', function (): void {
-    config()->set('nvl-settings.management.enabled', true);
-    config()->set('nvl-settings.management.path', 'api/internal/runtime-settings');
-    config()->set('nvl-settings.management.name', 'runtime.settings');
-    config()->set('nvl-settings.management.middleware', []);
     config()->set('nvl-settings.management.authorization_ability', 'manage-settings');
     Gate::define(
         'manage-settings',
@@ -113,7 +117,8 @@ test('management routes return stable unknown and stale error contracts', functi
             true,
         ),
     );
-    require __DIR__.'/../routes/api.php';
+    registerSettingsManagementFixtureRoutes();
+    $this->actingAs(new GenericUser(['id' => 'user-1']));
     app(DefinitionRepository::class)->fake([
         'interface.theme' => [
             'type' => SettingType::Text,
@@ -149,16 +154,13 @@ test('management routes return stable unknown and stale error contracts', functi
 });
 
 test('management writes require an explicit value and optimistic revision', function (): void {
-    config()->set('nvl-settings.management.enabled', true);
-    config()->set('nvl-settings.management.path', 'api/internal/runtime-settings');
-    config()->set('nvl-settings.management.name', 'runtime.settings');
-    config()->set('nvl-settings.management.middleware', []);
     config()->set('nvl-settings.management.authorization_ability', 'manage-settings');
     Gate::define(
         'manage-settings',
         static fn (?Authenticatable $actor, string $ability): bool => $ability === 'set',
     );
-    require __DIR__.'/../routes/api.php';
+    registerSettingsManagementFixtureRoutes();
+    $this->actingAs(new GenericUser(['id' => 'user-1']));
     app(DefinitionRepository::class)->fake([
         'interface.theme' => [
             'type' => SettingType::Text,

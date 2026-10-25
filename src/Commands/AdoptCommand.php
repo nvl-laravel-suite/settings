@@ -7,7 +7,8 @@ namespace Nvl\Settings\Commands;
 use Illuminate\Console\Command;
 use InvalidArgumentException;
 use JsonException;
-use Nvl\Settings\Actions\AdoptSettingsAction;
+use Nvl\Settings\Services\SettingsAdopter;
+use Nvl\Support\Enums\SystemActor;
 
 /**
  * Plans or applies a manifest-driven import from staged legacy settings.
@@ -26,7 +27,7 @@ final class AdoptCommand extends Command
     /**
      * Execute the adoption plan or apply phase.
      */
-    public function handle(AdoptSettingsAction $adopt): int
+    public function handle(SettingsAdopter $adopt): int
     {
         $format = $this->option('format');
 
@@ -72,7 +73,7 @@ final class AdoptCommand extends Command
         }
 
         /** @var array<array-key, mixed> $decoded */
-        $result = $adopt->execute($decoded, apply: (bool) $this->option('apply'));
+        $result = $adopt->execute($decoded, apply: (bool) $this->option('apply'), actor: $this->option('apply') ? SystemActor::Background : null);
 
         if ($format === 'json') {
             $this->line((string) json_encode($result, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));

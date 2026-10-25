@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace Nvl\Settings\Tests;
 
 use Illuminate\Foundation\Testing\DatabaseMigrations;
-use Nvl\Data\Providers\DataServiceProvider;
 use Nvl\Settings\Providers\SettingsServiceProvider;
 use Nvl\Support\Providers\LocaleServiceProvider;
 use Nvl\Support\Providers\SupportServiceProvider;
-use Nvl\Tenancy\Providers\TenancyServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use RuntimeException;
 
@@ -21,8 +19,6 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
     use DatabaseMigrations;
 
     protected bool $enableBootstrap = false;
-
-    protected ?bool $enableTenancy = null;
 
     protected string $databasePath;
 
@@ -79,8 +75,6 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
         return [
             LocaleServiceProvider::class,
             SupportServiceProvider::class,
-            DataServiceProvider::class,
-            TenancyServiceProvider::class,
             SettingsServiceProvider::class,
         ];
     }
@@ -101,8 +95,6 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
             'nvl-settings.discovery.cache' => false,
             'nvl-settings.cache.enabled' => false,
             'nvl-settings.overrides.enabled' => $this->enableBootstrap,
-            'nvl-tenancy.enabled' => $this->enableTenancy ?? $this->enableBootstrap,
-            'nvl-tenancy.migrations.enabled' => false,
         ]);
     }
 }

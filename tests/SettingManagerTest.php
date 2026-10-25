@@ -11,13 +11,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Nvl\Settings\Actions\GetManySettingsAction;
-use Nvl\Settings\Actions\GetSettingAction;
-use Nvl\Settings\Actions\ResetSettingAction;
-use Nvl\Settings\Actions\SetSettingAction;
-use Nvl\Settings\Adapters\Laravel\LaravelSettingsAuditContextProvider;
 use Nvl\Settings\Contracts\SettingRepository;
-use Nvl\Settings\Data\SettingMutationData;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Events\SettingChanged;
 use Nvl\Settings\Exceptions\InvalidDefinitionException;
@@ -25,10 +19,13 @@ use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Providers\SettingsServiceProvider;
 use Nvl\Settings\Services\ConfigOverrideApplier;
+use Nvl\Settings\Services\SettingReader;
 use Nvl\Settings\Services\SettingsDoctor;
+use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingsRules;
-use Nvl\Settings\Testing\InteractsWithSettings;
+use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
+use Nvl\Settings\Tests\Fixtures\LaravelSettingsAuditContextProvider;
 use Nvl\Settings\Tests\TestCase;
 
 uses(InteractsWithSettings::class);
@@ -45,7 +42,7 @@ it('preserves nested settings defaults around consumer overrides', function (): 
     expect(config('nvl-settings.storage.table'))->toBe('consumer_settings')
         ->and(config('nvl-settings.storage.connection'))->toBeNull()
         ->and(config('nvl-settings.cache.key'))->toBe('nvl:settings:v2')
-        ->and(config('nvl-settings.management.enabled'))->toBeFalse();
+        ->and(config('nvl-settings.management.authorization_ability'))->toBeNull();
 });
 
 it('captures non-model audit actors and rejects malformed rule parameters safely', function (): void {
@@ -61,11 +58,10 @@ it('captures non-model audit actors and rejects malformed rule parameters safely
         'id' => 'actor-1',
         'email' => 'actor@example.test',
     ]));
-    $context = (new LaravelSettingsAuditContextProvider($request))->current();
+    $metadata = (new LaravelSettingsAuditContextProvider($request))->metadata();
 
-    expect($context->actorType)->toBe(GenericUser::class)
-        ->and($context->actorId)->toBe('actor-1')
-        ->and($context->requestId)->toBe('request-1')
+    expect($metadata['request_id'])->toBe('request-1')
+        ->and($metadata['ip_address'])->toBe('127.0.0.1')
         ->and(fn () => SettingsRules::integerListBetweenParameters([
             'minimum' => '1',
             'maximum' => '10',
@@ -194,7 +190,7 @@ it('can set and get settings', function (): void {
 
     $repo = app(SettingRepository::class);
 
-    $repo->set('products.pricing.tax_inclusive', true);
+    settingsSetForTest('products.pricing.tax_inclusive', true);
 
     expect($repo->get('products.pricing.tax_inclusive'))->toBeTrue();
 });
@@ -206,8 +202,8 @@ it('persists definition fallbacks before an explicit sync and restores them on f
     ]);
 
     $repository = app(SettingRepository::class);
-    $repository->set('catalog.currency', 'BGN');
-    $repository->forget('catalog.currency');
+    settingsSetForTest('catalog.currency', 'BGN');
+    app(SettingWriter::class)->reset('catalog.currency', settingsTestActor(), 1);
 
     expect($repository->get('catalog.currency'))->toBe('EUR')
         ->and(Setting::query()->firstOrFail()->fallback)->toBe('EUR');
@@ -233,10 +229,8 @@ it('applies only explicitly allowed config overrides', function (): void {
     config()->set('app.key', 'protected');
 
     $repository = app(SettingRepository::class);
-    $repository->setMany([
-        'branding.name' => 'Public Brand',
-        'security.key' => 'must-not-apply',
-    ]);
+    settingsSetForTest('branding.name', 'Public Brand');
+    settingsSetForTest('security.key', 'must-not-apply');
     app(ConfigOverrideApplier::class)->apply();
 
     expect(config('app.name'))->toBe('Public Brand')
@@ -271,27 +265,28 @@ it('stores nullable overrides independently from their null payload', function (
         ],
     ]);
 
-    $stored = app(SetSettingAction::class)->execute(new SettingMutationData(
+    $stored = settingsSetForTest(
         key: 'catalog.optional_flag',
         value: null,
         expectedRevision: 0,
-    ));
+    );
     $record = Setting::query()->firstOrFail();
 
-    expect($stored->value)->toBeNull()
-        ->and($stored->source)->toBe('database')
-        ->and($stored->hasOverride)->toBeTrue()
+    expect($stored['value'])->toBeNull()
+        ->and($stored['source'])->toBe('database')
+        ->and($stored['has_override'])->toBeTrue()
         ->and($record->has_override)->toBeTrue()
         ->and($record->getRawOriginal('value'))->toBeNull();
 
-    $reset = app(ResetSettingAction::class)->execute(
+    $reset = app(SettingWriter::class)->reset(
         'catalog.optional_flag',
-        $stored->revision,
+        settingsTestActor(),
+        $stored['revision'],
     );
 
-    expect($reset->value)->toBeTrue()
-        ->and($reset->source)->toBe('definition')
-        ->and($reset->hasOverride)->toBeFalse();
+    expect($reset['value'])->toBeTrue()
+        ->and($reset['source'])->toBe('definition')
+        ->and($reset['has_override'])->toBeFalse();
 });
 
 it('does not emit setting changes or flush cache when an outer transaction rolls back', function (): void {
@@ -305,11 +300,11 @@ it('does not emit setting changes or flush cache when an outer transaction rolls
     $connection = DB::connection((new Setting)->getConnectionName());
     $connection->beginTransaction();
 
-    app(SetSettingAction::class)->execute(new SettingMutationData(
+    settingsSetForTest(
         key: 'catalog.enabled',
         value: true,
         expectedRevision: 0,
-    ));
+    );
 
     Event::assertNotDispatched(SettingChanged::class);
     $connection->rollBack();
@@ -326,11 +321,11 @@ it('emits one setting change after a committed mutation', function (): void {
     ]);
     Event::fake([SettingChanged::class]);
 
-    app(SetSettingAction::class)->execute(new SettingMutationData(
+    settingsSetForTest(
         key: 'catalog.enabled',
         value: true,
         expectedRevision: 0,
-    ));
+    );
 
     Event::assertDispatched(
         SettingChanged::class,
@@ -348,28 +343,29 @@ it('treats repeated canonical action and repository writes as no-ops', function 
             'default' => '2026-01-01T00:00:00+00:00',
         ],
     ]);
-    $first = app(SetSettingAction::class)->execute(new SettingMutationData(
+    $first = settingsSetForTest(
         key: 'catalog.launch_at',
         value: '2026-01-01T12:30:00+02:00',
         expectedRevision: 0,
-    ));
+    );
     $firstSyncedAt = Setting::query()->firstOrFail()->synced_at?->toAtomString();
     $this->travel(1)->minute();
     Event::fake([SettingChanged::class]);
 
-    $second = app(SetSettingAction::class)->execute(new SettingMutationData(
+    $second = settingsSetForTest(
         key: 'catalog.launch_at',
         value: '2026-01-01T10:30:00+00:00',
-        expectedRevision: $first->revision,
-    ));
-    app(SettingRepository::class)->set(
+        expectedRevision: $first['revision'],
+    );
+    settingsSetForTest(
         'catalog.launch_at',
         '2026-01-01T10:30:00+00:00',
+        $first['revision'],
     );
     $record = Setting::query()->firstOrFail();
 
-    expect($second->revision)->toBe($first->revision)
-        ->and($record->revision)->toBe($first->revision)
+    expect($second['revision'])->toBe($first['revision'])
+        ->and($record->revision)->toBe($first['revision'])
         ->and($record->synced_at?->toAtomString())->toBe($firstSyncedAt);
     Event::assertNotDispatched(SettingChanged::class);
 });
@@ -380,17 +376,12 @@ it('emits batch events only for settings whose persisted state changed', functio
         'catalog.first' => ['type' => SettingType::Boolean, 'default' => false],
         'catalog.second' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
-    $repository = app(SettingRepository::class);
-    $repository->setMany([
-        'catalog.first' => true,
-        'catalog.second' => true,
-    ]);
+    settingsSetForTest('catalog.first', true);
+    settingsSetForTest('catalog.second', true);
     Event::fake([SettingChanged::class]);
 
-    $repository->setMany([
-        'catalog.first' => true,
-        'catalog.second' => false,
-    ]);
+    settingsSetForTest('catalog.first', true, 1);
+    settingsSetForTest('catalog.second', false, 1);
 
     expect(Setting::query()->where('key', 'first')->firstOrFail()->revision)->toBe(1)
         ->and(Setting::query()->where('key', 'second')->firstOrFail()->revision)->toBe(2);
@@ -414,12 +405,12 @@ it('resolves many settings with one storage query while preserving input order',
 
     $this->defineSettings($definitions);
     config()->set('nvl-settings.cache.enabled', false);
-    app(SettingRepository::class)->set('catalog.item_2', 20);
+    settingsSetForTest('catalog.item_2', 20);
     $measure = static function (array $keys): array {
         DB::flushQueryLog();
         DB::enableQueryLog();
 
-        $values = app(GetManySettingsAction::class)->execute($keys);
+        $values = app(SettingReader::class)->getMany($keys);
         $queries = array_values(array_filter(
             DB::getQueryLog(),
             static fn (array $query): bool => str_starts_with(
@@ -434,9 +425,9 @@ it('resolves many settings with one storage query while preserving input order',
     [, $singleQueryCount] = $measure(['catalog.item_1']);
     [$values, $populatedQueryCount] = $measure(array_keys($definitions));
 
-    expect(array_map(static fn ($value): string => $value->key, $values))
+    expect(array_map(static fn ($value): string => $value['key'], $values))
         ->toBe(array_keys($definitions))
-        ->and($values[1]->value)->toBe(20)
+        ->and($values[1]['value'])->toBe(20)
         ->and($singleQueryCount)->toBe(1)
         ->and($populatedQueryCount)->toBe($singleQueryCount);
 });
@@ -472,7 +463,7 @@ it('normalizes date-time overrides to UTC without inflating first-write revision
         ],
     ]);
 
-    app(SettingRepository::class)->set(
+    settingsSetForTest(
         'catalog.launch_at',
         '2026-01-01T12:30:00+02:00',
     );
@@ -557,29 +548,29 @@ it('uses UUIDs, typed values, and optimistic concurrency actions', function (): 
         ],
     ]);
 
-    $initial = app(GetSettingAction::class)->execute('catalog.tax_rate');
-    $stored = app(SetSettingAction::class)->execute(new SettingMutationData(
+    $initial = app(SettingReader::class)->get('catalog.tax_rate');
+    $stored = settingsSetForTest(
         key: 'catalog.tax_rate',
         value: '0.25',
         expectedRevision: 0,
-    ));
-    $reset = app(ResetSettingAction::class)->execute('catalog.tax_rate', $stored->revision);
+    );
+    $reset = app(SettingWriter::class)->reset('catalog.tax_rate', settingsTestActor(), $stored['revision']);
 
-    expect($initial->source)->toBe('definition')
-        ->and($stored->source)->toBe('database')
-        ->and($stored->value)->toBe('0.25')
-        ->and($reset->source)->toBe('definition')
+    expect($initial['source'])->toBe('definition')
+        ->and($stored['source'])->toBe('database')
+        ->and($stored['value'])->toBe('0.25')
+        ->and($reset['source'])->toBe('definition')
         ->and(Setting::query()->firstOrFail()->getKey())->toBeUuid()
-        ->and(fn () => app(SetSettingAction::class)->execute(new SettingMutationData(
+        ->and(fn () => settingsSetForTest(
             key: 'catalog.tax_rate',
             value: '0.30',
             expectedRevision: 0,
-        )))->toThrow(StaleSettingVersionException::class)
-        ->and(fn () => app(SetSettingAction::class)->execute(new SettingMutationData(
+        ))->toThrow(StaleSettingVersionException::class)
+        ->and(fn () => settingsSetForTest(
             key: 'catalog.tax_rate',
             value: '0.30',
-            expectedRevision: $stored->revision,
-        )))->toThrow(StaleSettingVersionException::class);
+            expectedRevision: $stored['revision'],
+        ))->toThrow(StaleSettingVersionException::class);
 });
 
 it('refreshes the discovery cache after definition files are added', function (): void {
@@ -644,14 +635,14 @@ it('restores an orphaned row through the repository mutation boundary', function
         'catalog.active' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
     $repository = app(SettingRepository::class);
-    $repository->set('catalog.active', true);
+    settingsSetForTest('catalog.active', true);
     $setting = Setting::query()->firstOrFail();
     Setting::query()->whereKey($setting->getKey())->update([
         'orphaned_at' => now(),
         'revision' => $setting->revision + 1,
     ]);
 
-    $repository->set('catalog.active', true);
+    settingsSetForTest('catalog.active', true, 2);
     $restored = Setting::query()->firstOrFail();
 
     expect($restored->orphaned_at)->toBeNull()
@@ -663,11 +654,11 @@ it('preserves live overrides and monotonic revisions while definitions change', 
     $this->defineSettings([
         'catalog.label' => ['type' => SettingType::Text, 'default' => 'Original'],
     ]);
-    $stored = app(SetSettingAction::class)->execute(new SettingMutationData(
+    $stored = settingsSetForTest(
         key: 'catalog.label',
         value: 'Runtime',
         expectedRevision: 0,
-    ));
+    );
     app(DefinitionRepository::class)->fake([
         'catalog.label' => ['type' => SettingType::Text, 'default' => 'Changed'],
     ]);
@@ -678,7 +669,7 @@ it('preserves live overrides and monotonic revisions while definitions change', 
     expect($setting->value)->toBe('Runtime')
         ->and($setting->fallback)->toBe('Changed')
         ->and($setting->has_override)->toBeTrue()
-        ->and($setting->revision)->toBeGreaterThan($stored->revision);
+        ->and($setting->revision)->toBeGreaterThan($stored['revision']);
 });
 
 it('rolls back synchronization when a stored override violates a changed type', function (): void {
@@ -686,7 +677,7 @@ it('rolls back synchronization when a stored override violates a changed type', 
     $this->defineSettings([
         'catalog.value' => ['type' => SettingType::Text, 'default' => 'default'],
     ]);
-    app(SettingRepository::class)->set('catalog.value', 'not-an-integer');
+    settingsSetForTest('catalog.value', 'not-an-integer');
     $before = Setting::query()->firstOrFail();
     app(DefinitionRepository::class)->fake([
         'catalog.value' => ['type' => SettingType::Integer, 'default' => 10],
@@ -707,7 +698,7 @@ it('returns a failing dry-run status when a stored override violates a changed t
     $this->defineSettings([
         'catalog.value' => ['type' => SettingType::Text, 'default' => 'default'],
     ]);
-    app(SettingRepository::class)->set('catalog.value', 'not-an-integer');
+    settingsSetForTest('catalog.value', 'not-an-integer');
     app(DefinitionRepository::class)->fake([
         'catalog.value' => ['type' => SettingType::Integer, 'default' => 10],
     ]);
@@ -726,33 +717,31 @@ it('does not reset synchronized rows that have no override', function (): void {
     ]);
     $this->artisan('nvl:settings:sync')->assertSuccessful();
 
-    $this->artisan('nvl:settings:reset', ['pattern' => 'catalog.enabled'])
-        ->expectsOutputToContain('Reset 0 settings')
-        ->assertSuccessful();
+    $reset = app(SettingWriter::class)->reset('catalog.enabled', settingsTestActor(), 1);
 
-    expect(Setting::query()->firstOrFail()->revision)->toBe(1)
+    expect($reset['revision'])->toBe(1)
+        ->and(Setting::query()->firstOrFail()->revision)->toBe(1)
         ->and(Setting::query()->firstOrFail()->has_override)->toBeFalse();
 });
 
-it('resets an exact two-segment setting key through the command action boundary', function (): void {
+it('resets an exact two-segment setting key through the writer', function (): void {
     /** @var TestCase $this */
     $this->defineSettings([
         'interface.theme' => ['type' => SettingType::Text, 'default' => 'light'],
     ]);
-    app(SetSettingAction::class)->execute(new SettingMutationData(
+    settingsSetForTest(
         key: 'interface.theme',
         value: 'dark',
         expectedRevision: 0,
-    ));
+    );
 
-    $this->artisan('nvl:settings:reset', ['pattern' => 'interface.theme'])
-        ->assertSuccessful();
+    app(SettingWriter::class)->reset('interface.theme', settingsTestActor(), 1);
 
-    $value = app(GetSettingAction::class)->execute('interface.theme');
+    $value = app(SettingReader::class)->get('interface.theme');
 
-    expect($value->value)->toBe('light')
-        ->and($value->source)->toBe('definition')
-        ->and($value->revision)->toBe(2);
+    expect($value['value'])->toBe('light')
+        ->and($value['source'])->toBe('definition')
+        ->and($value['revision'])->toBe(2);
 });
 
 it('resolves scheduled overrides and their effective source at runtime', function (): void {
@@ -762,28 +751,27 @@ it('resolves scheduled overrides and their effective source at runtime', functio
     ]);
     $start = now()->addHour();
     $end = now()->addHours(2);
-    $scheduled = app(SetSettingAction::class)->execute(new SettingMutationData(
+    $scheduled = settingsSetForTest(
         key: 'interface.theme',
         value: 'dark',
         expectedRevision: 0,
-        validFrom: $start->toAtomString(),
-        validUntil: $end->toAtomString(),
-    ));
+        options: ['valid_from' => $start->toAtomString(), 'valid_until' => $end->toAtomString()],
+    );
 
-    expect($scheduled->value)->toBe('light')
-        ->and($scheduled->source)->toBe('definition');
+    expect($scheduled['value'])->toBe('light')
+        ->and($scheduled['source'])->toBe('definition');
 
     $this->travelTo($start->copy()->addMinute());
-    $active = app(GetSettingAction::class)->execute('interface.theme');
+    $active = app(SettingReader::class)->get('interface.theme');
 
-    expect($active->value)->toBe('dark')
-        ->and($active->source)->toBe('database');
+    expect($active['value'])->toBe('dark')
+        ->and($active['source'])->toBe('database');
 
     $this->travelTo($end->copy()->addMinute());
-    $expired = app(GetSettingAction::class)->execute('interface.theme');
+    $expired = app(SettingReader::class)->get('interface.theme');
 
-    expect($expired->value)->toBe('light')
-        ->and($expired->source)->toBe('definition');
+    expect($expired['value'])->toBe('light')
+        ->and($expired['source'])->toBe('definition');
 });
 
 it('validates the effective window when validity fields are patched separately', function (): void {
@@ -791,19 +779,19 @@ it('validates the effective window when validity fields are patched separately',
     $this->defineSettings([
         'interface.theme' => ['type' => SettingType::Text, 'default' => 'light'],
     ]);
-    $stored = app(SetSettingAction::class)->execute(new SettingMutationData(
+    $stored = settingsSetForTest(
         key: 'interface.theme',
         value: 'dark',
         expectedRevision: 0,
-        validFrom: now()->addHours(2)->toAtomString(),
-    ));
+        options: ['valid_from' => now()->addHours(2)->toAtomString()],
+    );
 
-    expect(fn () => app(SetSettingAction::class)->execute(new SettingMutationData(
+    expect(fn () => settingsSetForTest(
         key: 'interface.theme',
         value: 'dark',
-        expectedRevision: $stored->revision,
-        validUntil: now()->addHour()->toAtomString(),
-    )))->toThrow(
+        expectedRevision: $stored['revision'],
+        options: ['valid_until' => now()->addHour()->toAtomString()],
+    ))->toThrow(
         ValidationException::class,
         'validity end must be after',
     );
@@ -820,12 +808,12 @@ it('rejects scheduled windows for boot-time configuration overrides', function (
         ],
     ]);
 
-    expect(fn () => app(SetSettingAction::class)->execute(new SettingMutationData(
+    expect(fn () => settingsSetForTest(
         key: 'branding.name',
         value: 'Scheduled Brand',
         expectedRevision: 0,
-        validFrom: now()->addHour()->toAtomString(),
-    )))->toThrow(
+        options: ['valid_from' => now()->addHour()->toAtomString()],
+    ))->toThrow(
         ValidationException::class,
         'cannot use scheduled validity windows',
     );
@@ -837,12 +825,12 @@ it('rejects sub-second validity windows that storage cannot preserve', function 
         'interface.theme' => ['type' => SettingType::Text, 'default' => 'light'],
     ]);
 
-    expect(fn () => app(SetSettingAction::class)->execute(new SettingMutationData(
+    expect(fn () => settingsSetForTest(
         key: 'interface.theme',
         value: 'dark',
         expectedRevision: 0,
-        validFrom: '2026-01-01T10:30:00.123+00:00',
-    )))->toThrow(
+        options: ['valid_from' => '2026-01-01T10:30:00.123+00:00'],
+    ))->toThrow(
         ValidationException::class,
         'whole-second precision',
     );

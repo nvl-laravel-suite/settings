@@ -9,7 +9,7 @@ use Illuminate\Contracts\Console\Isolatable;
 use Illuminate\Validation\ValidationException;
 use Nvl\Settings\Enums\SettingPruneStrategy;
 use Nvl\Settings\Exceptions\SettingException;
-use Nvl\Settings\Services\SettingSynchronizer;
+use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
 use Throwable;
@@ -28,7 +28,7 @@ final class SyncCommand extends Command implements Isolatable
      */
     public function handle(
         DefinitionRepository $repository,
-        SettingSynchronizer $synchronizer,
+        SettingWriter $writer,
     ): int {
         $dryRun = $this->option('dry-run') === true;
         $providerOption = $this->option('provider');
@@ -39,7 +39,6 @@ final class SyncCommand extends Command implements Isolatable
             : (is_string($configuredPrune)
                 ? SettingPruneStrategy::tryFrom($configuredPrune)
                 : null);
-        $respectDatabaseValues = config('nvl-settings.sync.respect_db_values', true) === true;
 
         if (! $prune instanceof SettingPruneStrategy) {
             $value = is_scalar($configuredPrune) ? (string) $configuredPrune : get_debug_type($configuredPrune);
@@ -61,35 +60,30 @@ final class SyncCommand extends Command implements Isolatable
 
         if ($dryRun) {
             try {
-                $result = $synchronizer->preview($definitions, $provider, $prune);
+                $result = $writer->sync($provider, $prune, dryRun: true);
             } catch (Throwable $throwable) {
                 $this->error($throwable->getMessage());
 
                 return self::FAILURE;
             }
 
-            foreach ($result->failures as $failure) {
+            foreach ($result['failures'] as $failure) {
                 $this->error($failure);
             }
 
-            $this->info("[Dry Run] Would synchronize {$result->synchronized} settings.");
+            $this->info("[Dry Run] Would synchronize {$result['synchronized']} settings.");
 
-            if ($result->orphans > 0) {
+            if ($result['orphans'] > 0) {
                 $this->info(
-                    "[Dry Run] Would {$prune->value} {$result->orphans} orphaned settings.",
+                    "[Dry Run] Would {$prune->value} {$result['orphans']} orphaned settings.",
                 );
             }
 
-            return $result->isValid() ? self::SUCCESS : self::FAILURE;
+            return $result['failures'] === [] ? self::SUCCESS : self::FAILURE;
         }
 
         try {
-            $result = $synchronizer->synchronize(
-                $definitions,
-                $provider,
-                $prune,
-                $respectDatabaseValues,
-            );
+            $result = $writer->sync($provider, $prune);
         } catch (ValidationException $exception) {
             $this->error($this->firstValidationError($exception));
 
@@ -100,11 +94,11 @@ final class SyncCommand extends Command implements Isolatable
             return self::FAILURE;
         }
 
-        $this->info("Synchronized {$result->synchronized} settings.");
+        $this->info("Synchronized {$result['synchronized']} settings.");
 
-        if ($result->orphans > 0) {
+        if ($result['orphans'] > 0) {
             $this->info(
-                ucfirst($prune->value)."d {$result->orphans} orphaned settings.",
+                ucfirst($prune->value)."d {$result['orphans']} orphaned settings.",
             );
         }
 

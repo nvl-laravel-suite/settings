@@ -6,15 +6,12 @@ namespace Nvl\Settings\Services;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
-use Nvl\Settings\Contracts\SettingsAuthorization;
-use Nvl\Settings\Data\SettingsDoctorCheckData;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Settings\Support\SettingsRouteConfiguration;
+use Nvl\Settings\Support\SettingsDoctorCheck;
 use Throwable;
 
 /**
@@ -25,15 +22,12 @@ final readonly class SettingsDoctor
     /**
      * Create the Settings readiness inspector.
      */
-    public function __construct(
-        private DefinitionRepository $definitions,
-        private SettingsAuthorization $authorization,
-    ) {}
+    public function __construct(private DefinitionRepository $definitions) {}
 
     /**
      * Return every Settings readiness check.
      *
-     * @return list<SettingsDoctorCheckData>
+     * @return list<SettingsDoctorCheck>
      */
     public function inspect(): array
     {
@@ -41,14 +35,13 @@ final readonly class SettingsDoctor
             ...$this->schemaChecks(),
             $this->definitionCheck(),
             $this->discoveryCacheCheck(),
-            $this->managementRouteCheck(),
         ];
     }
 
     /**
      * Inspect required columns, key type, indexes, and duplicate identities.
      *
-     * @return list<SettingsDoctorCheckData>
+     * @return list<SettingsDoctorCheck>
      */
     private function schemaChecks(): array
     {
@@ -59,7 +52,7 @@ final readonly class SettingsDoctor
         try {
             $exists = $schema->hasTable($table);
         } catch (Throwable $exception) {
-            return [new SettingsDoctorCheckData(
+            return [new SettingsDoctorCheck(
                 key: 'schema.connection',
                 severity: 'error',
                 passed: false,
@@ -68,7 +61,7 @@ final readonly class SettingsDoctor
         }
 
         if (! $exists) {
-            return [new SettingsDoctorCheckData(
+            return [new SettingsDoctorCheck(
                 key: 'schema.table',
                 severity: 'error',
                 passed: false,
@@ -81,22 +74,22 @@ final readonly class SettingsDoctor
             'has_override', 'definition_hash', 'revision', 'metadata', 'valid_from',
             'valid_until', 'synced_at', 'orphaned_at', 'created_at', 'updated_at',
         ];
-        $tenantEnabled = config('nvl-tenancy.enabled') === true;
-        if ($tenantEnabled) {
-            $required = [...$required, 'tenant_id', 'ownership_key'];
+        $owned = config('nvl-ownership.enabled') === true;
+        if ($owned) {
+            $required = [...$required, 'owner_scope_key', 'owner_reference'];
         }
         $missing = array_values(array_filter(
             $required,
             static fn (string $column): bool => ! $schema->hasColumn($table, $column),
         ));
         $checks = [
-            new SettingsDoctorCheckData(
+            new SettingsDoctorCheck(
                 key: 'schema.table',
                 severity: 'error',
                 passed: true,
                 message: "Table [{$table}] exists.",
             ),
-            new SettingsDoctorCheckData(
+            new SettingsDoctorCheck(
                 key: 'schema.compatibility',
                 severity: 'error',
                 passed: $missing === [],
@@ -104,7 +97,7 @@ final readonly class SettingsDoctor
                     ? "Table [{$table}] matches the canonical NVL Settings v1 schema."
                     : "Table [{$table}] exists but is not the NVL Settings v1 schema; treat it as a legacy name collision and rename it to a staging table before migration or adoption.",
             ),
-            new SettingsDoctorCheckData(
+            new SettingsDoctorCheck(
                 key: 'schema.columns',
                 severity: 'error',
                 passed: $missing === [],
@@ -119,7 +112,7 @@ final readonly class SettingsDoctor
         }
 
         $idType = $schema->getColumnType($table, 'id');
-        $checks[] = new SettingsDoctorCheckData(
+        $checks[] = new SettingsDoctorCheck(
             key: 'schema.id-type',
             severity: 'error',
             passed: in_array($idType, ['uuid', 'guid', 'char', 'varchar', 'string'], true),
@@ -128,8 +121,8 @@ final readonly class SettingsDoctor
         $indexes = collect($schema->getIndexes($table));
         $requiredIndexes = [
             'identity' => [
-                'columns' => $tenantEnabled
-                    ? ['ownership_key', 'namespace', 'scope', 'key']
+                'columns' => $owned
+                    ? ['owner_scope_key', 'namespace', 'scope', 'key']
                     : ['namespace', 'scope', 'key'],
                 'unique' => true,
             ],
@@ -146,12 +139,6 @@ final readonly class SettingsDoctor
                 'unique' => false,
             ],
         ];
-        if ($tenantEnabled) {
-            $requiredIndexes['tenant-lookup'] = [
-                'columns' => ['tenant_id', 'namespace', 'scope', 'key'],
-                'unique' => false,
-            ];
-        }
 
         foreach ($requiredIndexes as $key => $requirement) {
             $index = $indexes->first(
@@ -159,7 +146,7 @@ final readonly class SettingsDoctor
                     === $requirement['columns']
                     && $index['unique'] === $requirement['unique'],
             );
-            $checks[] = new SettingsDoctorCheckData(
+            $checks[] = new SettingsDoctorCheck(
                 key: "schema.index.{$key}",
                 severity: 'error',
                 passed: is_array($index),
@@ -169,15 +156,15 @@ final readonly class SettingsDoctor
             );
         }
 
-        $identityColumns = $tenantEnabled
-            ? ['ownership_key', 'namespace', 'scope', 'key']
+        $identityColumns = $owned
+            ? ['owner_scope_key', 'namespace', 'scope', 'key']
             : ['namespace', 'scope', 'key'];
         $duplicatesExist = Setting::query()
             ->select($identityColumns)
             ->groupBy($identityColumns)
             ->havingRaw('COUNT(*) > 1')
             ->exists();
-        $checks[] = new SettingsDoctorCheckData(
+        $checks[] = new SettingsDoctorCheck(
             key: 'schema.duplicate-identities',
             severity: 'error',
             passed: ! $duplicatesExist,
@@ -214,17 +201,16 @@ final readonly class SettingsDoctor
                 ),
             )
             ->exists();
-        if ($tenantEnabled) {
-            foreach ((clone $query)->select(['tenant_id', 'ownership_key'])->cursor() as $ownership) {
-                $tenantId = is_string($ownership->tenant_id) ? $ownership->tenant_id : null;
-                $expected = $tenantId === null ? 'platform' : 'tenant:'.$tenantId;
-                if (! is_string($ownership->ownership_key) || ! hash_equals($expected, $ownership->ownership_key)) {
+        if ($owned) {
+            foreach ((clone $query)->select(['owner_scope_key', 'owner_reference'])->cursor() as $ownership) {
+                if (! is_string($ownership->owner_scope_key) || $ownership->owner_scope_key === ''
+                    || (($ownership->owner_scope_key === 'central') !== ($ownership->owner_reference === null))) {
                     $invalidRowsExist = true;
                     break;
                 }
             }
         }
-        $checks[] = new SettingsDoctorCheckData(
+        $checks[] = new SettingsDoctorCheck(
             key: 'schema.row-integrity',
             severity: 'error',
             passed: ! $invalidRowsExist,
@@ -288,7 +274,7 @@ final readonly class SettingsDoctor
                 $invalidCodec = true;
             }
         }
-        $checks[] = new SettingsDoctorCheckData(
+        $checks[] = new SettingsDoctorCheck(
             key: 'schema.value-codec',
             severity: 'error',
             passed: ! $invalidCodec,
@@ -296,7 +282,7 @@ final readonly class SettingsDoctor
                 ? 'One or more stored values are not canonical for their declared type.'
                 : 'Stored fallbacks and overrides use canonical type encoding.',
         );
-        $checks[] = new SettingsDoctorCheckData(
+        $checks[] = new SettingsDoctorCheck(
             key: 'schema.identifiers',
             severity: 'error',
             passed: ! $invalidIdentifier,
@@ -309,7 +295,7 @@ final readonly class SettingsDoctor
             ->whereNotNull('valid_until')
             ->whereColumn('valid_until', '<=', 'valid_from')
             ->exists();
-        $checks[] = new SettingsDoctorCheckData(
+        $checks[] = new SettingsDoctorCheck(
             key: 'schema.validity-windows',
             severity: 'error',
             passed: ! $invalidWindowsExist,
@@ -324,20 +310,20 @@ final readonly class SettingsDoctor
     /**
      * Validate every configured source definition.
      */
-    private function definitionCheck(): SettingsDoctorCheckData
+    private function definitionCheck(): SettingsDoctorCheck
     {
         try {
             $this->definitions->refresh();
             $count = count($this->definitions->all());
 
-            return new SettingsDoctorCheckData(
+            return new SettingsDoctorCheck(
                 key: 'definitions',
                 severity: 'error',
                 passed: true,
                 message: "{$count} source definitions are valid.",
             );
         } catch (Throwable $exception) {
-            return new SettingsDoctorCheckData(
+            return new SettingsDoctorCheck(
                 key: 'definitions',
                 severity: 'error',
                 passed: false,
@@ -349,10 +335,10 @@ final readonly class SettingsDoctor
     /**
      * Validate the optional bootstrap discovery cache.
      */
-    private function discoveryCacheCheck(): SettingsDoctorCheckData
+    private function discoveryCacheCheck(): SettingsDoctorCheck
     {
         if (! (bool) config('nvl-settings.discovery.cache', true)) {
-            return new SettingsDoctorCheckData(
+            return new SettingsDoctorCheck(
                 key: 'definitions.cache',
                 severity: 'warning',
                 passed: true,
@@ -365,7 +351,7 @@ final readonly class SettingsDoctor
             $fresh = $this->definitions->refresh();
             $runtime = $this->definitions->map();
         } catch (Throwable $exception) {
-            return new SettingsDoctorCheckData(
+            return new SettingsDoctorCheck(
                 key: 'definitions.cache',
                 severity: 'error',
                 passed: false,
@@ -375,7 +361,7 @@ final readonly class SettingsDoctor
 
         $current = $fresh === $runtime;
 
-        return new SettingsDoctorCheckData(
+        return new SettingsDoctorCheck(
             key: 'definitions.cache',
             severity: 'warning',
             passed: (! file_exists($path) || is_readable($path)) && $current,
@@ -384,56 +370,6 @@ final readonly class SettingsDoctor
                 : (file_exists($path)
                     ? "Definition cache [{$path}] is readable and current."
                     : 'Definition cache is not built; discovery will scan configured roots.'),
-        );
-    }
-
-    /**
-     * Validate disabled-by-default management routing and authorization.
-     */
-    private function managementRouteCheck(): SettingsDoctorCheckData
-    {
-        if (! (bool) config('nvl-settings.management.enabled', false)) {
-            return new SettingsDoctorCheckData(
-                key: 'management.routes',
-                severity: 'warning',
-                passed: true,
-                message: 'Management routes are disabled.',
-            );
-        }
-
-        try {
-            $routeName = SettingsRouteConfiguration::name().'index';
-            SettingsRouteConfiguration::path();
-        } catch (InvalidArgumentException $exception) {
-            return new SettingsDoctorCheckData(
-                key: 'management.routes',
-                severity: 'error',
-                passed: false,
-                message: $exception->getMessage(),
-            );
-        }
-
-        $ability = config('nvl-settings.management.authorization_ability');
-        $authorizationConfigured = ! $this->authorization instanceof ConfiguredSettingsAuthorization
-            || (is_string($ability) && $ability !== '');
-        $middleware = array_values(array_filter(
-            (array) config('nvl-settings.management.middleware', []),
-            static fn (mixed $value): bool => is_string($value) && $value !== '',
-        ));
-        $healthy = $authorizationConfigured
-            && $middleware !== []
-            && Route::has($routeName);
-
-        return new SettingsDoctorCheckData(
-            key: 'management.routes',
-            severity: 'error',
-            passed: $healthy,
-            message: match (true) {
-                ! $authorizationConfigured => 'Management routes require consumer authorization.',
-                $middleware === [] => 'Management routes require middleware.',
-                ! Route::has($routeName) => 'Management routes are enabled but were not registered.',
-                default => 'Management routes are enabled and secured.',
-            },
         );
     }
 }

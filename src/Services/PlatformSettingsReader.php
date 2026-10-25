@@ -10,10 +10,9 @@ use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Support\Ownership\Contracts\OwnershipReadiness;
+use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
 use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Ownership\Services\OwnershipScope;
-use Nvl\Support\Tenancy\Contracts\TenantInstallationState;
-use Nvl\Support\Tenancy\Exceptions\TenantSchemaNotReady;
 
 /**
  * Reads only config-mapped records from the canonical legacy platform store.
@@ -27,7 +26,6 @@ final readonly class PlatformSettingsReader
      */
     public function __construct(
         private DefinitionRepository $definitions,
-        private TenantInstallationState $installation,
         private OwnershipReadiness $ownership,
         private OwnershipResourceRegistry $resources,
     ) {}
@@ -35,7 +33,7 @@ final readonly class PlatformSettingsReader
     /**
      * Determine whether an unadopted legacy platform store exists.
      *
-     * @throws TenantSchemaNotReady When persisted adoption or partial ownership schema exists
+     * @throws OwnershipConfigurationInvalid When storage and declared ownership disagree
      */
     public function available(): bool
     {
@@ -46,21 +44,18 @@ final readonly class PlatformSettingsReader
         if (! $schema->hasTable($setting->getTable())) {
             return false;
         }
-        if ($this->resources->get('settings.values')->ownership->strategy === 'captured') {
+        $captured = $this->resources->get('settings.values')->ownership->strategy === 'captured';
+        if ($captured) {
             $this->ownership->assertActive('settings.values');
 
             return true;
         }
 
-        $hasOwnership = $schema->hasColumn($setting->getTable(), 'ownership_key');
-        $hasTenant = $schema->hasColumn($setting->getTable(), 'tenant_id');
-        if ($hasOwnership !== $hasTenant) {
-            throw new TenantSchemaNotReady('The Settings ownership schema is not active for this deployment.');
-        }
-        if ($hasOwnership) {
-            $this->installation->assertUsable('settings.values');
-        } else {
-            $this->installation->assertUnadopted($connection, 'settings.values');
+        if ($schema->hasColumn($setting->getTable(), 'owner_scope_key')
+            || $schema->hasColumn($setting->getTable(), 'owner_reference')
+            || $schema->hasColumn($setting->getTable(), 'tenant_id')
+            || $schema->hasColumn($setting->getTable(), 'ownership_key')) {
+            throw new OwnershipConfigurationInvalid('Settings ownership storage exists without an active ownership declaration.');
         }
 
         return true;
@@ -71,7 +66,7 @@ final readonly class PlatformSettingsReader
      *
      * @return Collection<int, Setting>
      *
-     * @throws TenantSchemaNotReady When persisted adoption or partial ownership schema exists
+     * @throws OwnershipConfigurationInvalid When storage and declared ownership disagree
      */
     public function records(): Collection
     {
@@ -91,8 +86,6 @@ final readonly class PlatformSettingsReader
         $query = Setting::query()->withoutGlobalScope(OwnershipScope::class)->useWritePdo();
         if ($this->resources->get('settings.values')->ownership->strategy === 'captured') {
             $query->where('owner_scope_key', 'central')->whereNull('owner_reference');
-        } elseif ($query->getModel()->getConnection()->getSchemaBuilder()->hasColumn($query->getModel()->getTable(), 'ownership_key')) {
-            $query->where('ownership_key', 'platform');
         }
 
         return $query

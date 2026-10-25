@@ -12,10 +12,6 @@
                 "discovery.patterns",
                 "discovery.recursive",
                 "management.authorization_ability",
-                "management.enabled",
-                "management.middleware",
-                "management.name",
-                "management.path",
                 "migrations.enabled",
                 "overrides.enabled",
                 "storage.connection",
@@ -29,8 +25,7 @@
                 "discovery.maximum_files",
                 "discovery.maximum_json_depth",
                 "overrides.denied",
-                "sync.prune",
-                "sync.respect_db_values"
+                "sync.prune"
             ]
         }
     }

@@ -20,8 +20,6 @@ use Nvl\Support\Ownership\Traits\HasOwnership;
  * Persisted setting definition fallback and optional custom value.
  *
  * @property string $id
- * @property string|null $tenant_id
- * @property string|null $ownership_key
  * @property string|null $owner_scope_key
  * @property string|null $owner_reference
  * @property string $namespace
@@ -65,8 +63,6 @@ final class Setting extends Model implements Ownable
      */
     protected $fillable = [
         'namespace',
-        'tenant_id',
-        'ownership_key',
         'scope',
         'key',
         'type',

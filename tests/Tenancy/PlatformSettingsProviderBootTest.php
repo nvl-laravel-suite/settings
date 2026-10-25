@@ -9,17 +9,14 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\PlatformSettingsBootstrap;
 use Nvl\Settings\Services\PlatformSettingsRuntime;
 use Nvl\Settings\Tests\PlatformSettingsBootTestCase;
-use Nvl\Tenancy\Contracts\TenantContext;
-use Nvl\Tenancy\Enums\TenantContextMode;
-use Nvl\Tenancy\Exceptions\TenantBoundaryViolation;
-use Nvl\Tenancy\Exceptions\TenantConfigurationInvalid;
-use Nvl\Tenancy\Exceptions\TenantSchemaNotReady;
-use Nvl\Tenancy\Services\TenantGlobalJobRegistry;
+use Nvl\Support\Ownership\Contracts\OwnershipContext;
+use Nvl\Support\Ownership\Enums\OwnershipContextMode;
+use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
+use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
 uses(PlatformSettingsBootTestCase::class);
 
@@ -47,14 +44,14 @@ final class PlatformSettingsLifecycleProbeJob implements ShouldQueue
 }
 
 test('enabled provider boot defers persisted overrides until runtime and restores request configuration', function (): void {
-    app(SettingRepository::class)->set('branding.name', 'Persisted platform');
+    settingsSetForTest('branding.name', 'Persisted platform');
 
     $this->enableBootstrap = true;
     $this->refreshApplication();
 
     expect(config('app.name'))->toBe('Original platform')
-        ->and(app(TenantContext::class)->snapshot()->mode)->toBe(TenantContextMode::Unresolved);
-    Route::get('/runtime-name', static fn (): array => ['name' => config('app.name')]);
+        ->and(app(OwnershipContext::class)->snapshot()->mode)->toBe(OwnershipContextMode::Disabled);
+    Route::get('/runtime-name', static fn (): array => app(PlatformSettingsRuntime::class)->run(static fn (): array => ['name' => config('app.name')]));
     $this->getJson('/runtime-name')->assertOk()->assertJson(['name' => 'Persisted platform']);
     expect(config('app.name'))->toBe('Original platform');
 });
@@ -87,14 +84,14 @@ test('enabled runtime rejects a partial settings ownership schema after a safe p
     try {
         $this->refreshApplication();
         expect(fn () => app(PlatformSettingsRuntime::class)->run(static fn (): null => null))
-            ->toThrow(TenantSchemaNotReady::class);
+            ->toThrow(OwnershipConfigurationInvalid::class);
     } finally {
         $this->enableBootstrap = false;
         $this->refreshApplication();
     }
 })->with([
-    'ownership discriminator only' => 'ownership_key',
-    'tenant identifier only' => 'tenant_id',
+    'ownership scope only' => 'owner_scope_key',
+    'owner reference only' => 'owner_reference',
 ]);
 
 test('enabled provider boot succeeds without storage and runtime propagates the connection failure', function (): void {
@@ -118,15 +115,14 @@ test('enabled provider boot succeeds without storage and runtime propagates the 
 
 test('platform settings bootstrap rejects direct calls after application boot', function (): void {
     expect(fn () => app(PlatformSettingsBootstrap::class)->apply())
-        ->toThrow(TenantBoundaryViolation::class, 'Platform configuration bootstrap has ended.');
+        ->toThrow(OwnershipViolation::class, 'Platform configuration bootstrap has ended.');
 });
 
 test('enabled runtime restores configuration between jobs and after nested or failed sync dispatch', function (): void {
-    app(SettingRepository::class)->set('branding.name', 'Persisted platform');
+    settingsSetForTest('branding.name', 'Persisted platform');
     $this->enableBootstrap = true;
     $this->refreshApplication();
     config()->set('queue.default', 'sync');
-    app(TenantGlobalJobRegistry::class)->register(PlatformSettingsLifecycleProbeJob::class);
     PlatformSettingsLifecycleProbeJob::$names = [];
 
     Queue::push(new PlatformSettingsLifecycleProbeJob(nested: true));
@@ -143,7 +139,7 @@ test('enabled runtime restores configuration between jobs and after nested or fa
 });
 
 test('explicit runtime restores configuration when request work throws', function (): void {
-    app(SettingRepository::class)->set('branding.name', 'Persisted platform');
+    settingsSetForTest('branding.name', 'Persisted platform');
     $this->enableBootstrap = true;
     $this->refreshApplication();
 
@@ -154,25 +150,16 @@ test('explicit runtime restores configuration when request work throws', functio
     expect(config('app.name'))->toBe('Original platform');
 });
 
-test('a quarantined sync job cannot restore its enclosing request projection', function (): void {
-    app(SettingRepository::class)->set('branding.name', 'Persisted platform');
+test('a failed nested job cannot restore its enclosing request projection', function (): void {
+    settingsSetForTest('branding.name', 'Persisted platform');
     $this->enableBootstrap = true;
-    $this->enableTenancy = false;
     $this->refreshApplication();
     config()->set('queue.default', 'sync');
-    config()->set('queue.failed.driver', null);
-    app()->forgetInstance('queue.failer');
-    Queue::createPayloadUsing(static fn (?string $connection, ?string $queue, array $payload): array => [
-        'data' => array_merge($payload['data'], ['nvl_tenancy' => null]),
-    ]);
 
-    try {
-        app(PlatformSettingsRuntime::class)->run(static function (): void {
-            expect(fn () => Queue::push(new PlatformSettingsLifecycleProbeJob))->toThrow(TenantConfigurationInvalid::class);
-            expect(config('app.name'))->toBe('Persisted platform');
-        });
-        expect(config('app.name'))->toBe('Original platform');
-    } finally {
-        Queue::createPayloadUsing(null);
-    }
+    app(PlatformSettingsRuntime::class)->run(static function (): void {
+        expect(fn () => Queue::push(new PlatformSettingsLifecycleProbeJob(fail: true)))
+            ->toThrow(RuntimeException::class, 'Settings job failure.');
+        expect(config('app.name'))->toBe('Persisted platform');
+    });
+    expect(config('app.name'))->toBe('Original platform');
 });

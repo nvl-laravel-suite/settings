@@ -25,7 +25,6 @@ return [
     ],
 
     'sync' => [
-        'respect_db_values' => true,
         'prune' => 'orphan', // orphan | delete | ignore
     ],
 
@@ -44,10 +43,6 @@ return [
     ],
 
     'management' => [
-        'enabled' => false,
-        'path' => 'nvl/api/v1/settings',
-        'name' => 'nvl.settings.management.',
-        'middleware' => ['api', 'auth', 'throttle:60,1'],
         'authorization_ability' => null,
     ],
 

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Nvl\Settings\Commands;
 
 use Illuminate\Console\Command;
-use Nvl\Settings\Actions\ValidateSettingsSourcesAction;
 use Nvl\Settings\Exceptions\SettingException;
+use Nvl\Settings\Services\SettingsSourceValidator;
 
 /**
  * Validates configured PHP and JSON setting sources without persistence.
@@ -21,7 +21,7 @@ final class ValidateCommand extends Command
     /**
      * Validate source discovery, parsing, defaults, and definition uniqueness.
      */
-    public function handle(ValidateSettingsSourcesAction $action): int
+    public function handle(SettingsSourceValidator $validator): int
     {
         $format = $this->option('format');
 
@@ -32,7 +32,7 @@ final class ValidateCommand extends Command
         }
 
         try {
-            $status = $action->execute();
+            $status = $validator->inspect();
         } catch (SettingException $exception) {
             if ($format === 'json') {
                 $this->line((string) json_encode([
@@ -48,16 +48,16 @@ final class ValidateCommand extends Command
 
         if ($format === 'json') {
             $this->line((string) json_encode(
-                $status->toArray(),
+                $status,
                 JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT,
             ));
         } else {
             $this->info(sprintf(
                 'Validated %d definitions from %d source files.',
-                $status->definitionCount,
-                $status->sourceCount,
+                $status['definition_count'],
+                $status['source_count'],
             ));
-            $this->line("Checksum: {$status->checksum}");
+            $this->line("Checksum: {$status['checksum']}");
         }
 
         return self::SUCCESS;

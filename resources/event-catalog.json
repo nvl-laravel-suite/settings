@@ -2,7 +2,7 @@
   "schema_version": 1,
   "package": "nvl/settings",
   "documentation": "docs/events.md",
-  "implementation_status": "implemented; executable acceptance proof pending",
+  "implementation_status": "implemented; owning tests exercise native publication and payload shape",
   "events": [
     {
       "class": "Nvl\\Settings\\Events\\SettingChanged",
@@ -34,28 +34,14 @@
         },
         {
           "name": "context",
-          "type": "?Nvl\\Settings\\Data\\SettingAuditContextData",
+          "type": "?Nvl\\Settings\\Support\\SettingAuditContext",
           "visibility": "parameter",
           "required": false,
           "default_expression": "null"
         },
         {
-          "name": "tenantId",
-          "type": "?string",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "null"
-        },
-        {
-          "name": "ownershipKey",
-          "type": "string",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "'platform'"
-        },
-        {
-          "name": "envelope",
-          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantJobEnvelope",
+          "name": "ownershipEnvelope",
+          "type": "?Nvl\\Support\\Ownership\\ValueObjects\\OwnershipJobEnvelope",
           "visibility": "private",
           "required": false,
           "default_expression": "null"
@@ -66,13 +52,6 @@
           "visibility": "public",
           "required": false,
           "default_expression": "1"
-        },
-        {
-          "name": "ownershipEnvelope",
-          "type": "?Nvl\\Support\\Ownership\\ValueObjects\\OwnershipJobEnvelope",
-          "visibility": "private",
-          "required": false,
-          "default_expression": "null"
         }
       ],
       "public_fields": [
@@ -94,15 +73,7 @@
         },
         {
           "name": "context",
-          "type": "Nvl\\Settings\\Data\\SettingAuditContextData"
-        },
-        {
-          "name": "tenantId",
-          "type": "?string"
-        },
-        {
-          "name": "ownershipKey",
-          "type": "string"
+          "type": "Nvl\\Settings\\Support\\SettingAuditContext"
         },
         {
           "name": "schemaVersion",
@@ -110,7 +81,7 @@
         },
         {
           "name": "subject",
-          "type": "Nvl\\Settings\\Data\\SettingSubjectReferenceData"
+          "type": "Nvl\\Settings\\Support\\SettingSubjectReference"
         }
       ],
       "kind": "value_object",
@@ -119,40 +90,22 @@
       "aliases": [],
       "producers": [
         {
-          "path": "packages/nvl/settings/src/Actions/ResetSettingAction.php",
-          "trigger": "Value-free runtime setting mutation.",
-          "connection": "$connection = DB::connection($model->getConnectionName())",
-          "construction_expression": "new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext))"
-        },
-        {
-          "path": "packages/nvl/settings/src/Actions/SetSettingAction.php",
-          "trigger": "Value-free runtime setting mutation.",
-          "connection": "$connection = DB::connection($model->getConnectionName())",
-          "construction_expression": "new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext))"
-        },
-        {
-          "path": "packages/nvl/settings/src/SettingManager.php",
-          "trigger": "Value-free runtime setting mutation.",
-          "connection": "$connection = DB::connection((new Setting)->getConnectionName())",
-          "construction_expression": "new SettingChanged($id, $key, $revision, 'set', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext))"
-        },
-        {
-          "path": "packages/nvl/settings/src/SettingManager.php",
-          "trigger": "Value-free runtime setting mutation.",
-          "connection": "$connection = DB::connection((new Setting)->getConnectionName())",
-          "construction_expression": "new SettingChanged($id, $fullKey, $revision, 'reset', $context, $tenantId, $ownershipKey, TenantJobEnvelope::capture($this->tenantContext))"
+          "path": "packages/nvl/settings/src/Services/SettingWriter.php",
+          "trigger": "Committed set/reset mutation.",
+          "connection": "$connection = $this->database->connection((new Setting)->getConnectionName())",
+          "construction_expression": "new SettingChanged($setting->getKey(), $key, $setting->revision, $operation, $context, OwnershipJobEnvelope::capture($this->ownershipContext))"
         }
       ],
       "security_notes": [
-        "Value-free setting ID/key/revision and persisted tenant/ownership identity; context can carry actor ID, request ID, IP address and user agent. Treat request metadata as private. subject is the scalar nvl_setting reference. Private captured TenantJobEnvelope is available through tenantJobEnvelope(); it contains no model."
+        "Value-free setting ID, key, revision and operation; actor identity comes only from the explicit mutation principal. Optional bounded request metadata comes from a consumer provider. The private native OwnershipJobEnvelope contains scalar capture, no model."
       ],
-      "no_op_semantics": "Unchanged writes and absent resets emit nothing. Set/reset facts capture ownership and request context before commit; never resolve tenant context later."
+      "no_op_semantics": "Equivalent set writes and resets of uncustomized rows emit nothing. Rolled back writes emit nothing; captured facts publish after the actual outer source connection commit."
     }
   ],
   "value_types": [
     {
-      "class": "Nvl\\Settings\\Data\\SettingAuditContextData",
-      "source": "packages/nvl/settings/src/Data/SettingAuditContextData.php",
+      "class": "Nvl\\Settings\\Support\\SettingAuditContext",
+      "source": "packages/nvl/settings/src/Support/SettingAuditContext.php",
       "constructor_fields": [
         {
           "name": "actorType",
@@ -215,8 +168,8 @@
       "kind": "value_object"
     },
     {
-      "class": "Nvl\\Settings\\Data\\SettingSubjectReferenceData",
-      "source": "packages/nvl/settings/src/Data/SettingSubjectReferenceData.php",
+      "class": "Nvl\\Settings\\Support\\SettingSubjectReference",
+      "source": "packages/nvl/settings/src/Support/SettingSubjectReference.php",
       "constructor_fields": [
         {
           "name": "id",
@@ -239,111 +192,6 @@
       "constants": {
         "type": "nvl_setting"
       }
-    },
-    {
-      "class": "Nvl\\Support\\Tenancy\\Enums\\TenantContextMode",
-      "source": "packages/nvl/core/support/src/Tenancy/Enums/TenantContextMode.php",
-      "constructor_fields": [],
-      "public_fields": [],
-      "kind": "enum",
-      "backing_type": "string",
-      "cases": [
-        {
-          "name": "Disabled",
-          "value": "disabled"
-        },
-        {
-          "name": "Unresolved",
-          "value": "unresolved"
-        },
-        {
-          "name": "Tenant",
-          "value": "tenant"
-        },
-        {
-          "name": "Platform",
-          "value": "platform"
-        }
-      ]
-    },
-    {
-      "class": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantContextSnapshot",
-      "source": "packages/nvl/core/support/src/Tenancy/ValueObjects/TenantContextSnapshot.php",
-      "constructor_fields": [
-        {
-          "name": "mode",
-          "type": "Nvl\\Support\\Tenancy\\Enums\\TenantContextMode",
-          "visibility": "public",
-          "required": true
-        },
-        {
-          "name": "tenantId",
-          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantId",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "null"
-        }
-      ],
-      "public_fields": [
-        {
-          "name": "mode",
-          "type": "Nvl\\Support\\Tenancy\\Enums\\TenantContextMode"
-        },
-        {
-          "name": "tenantId",
-          "type": "?Nvl\\Support\\Tenancy\\ValueObjects\\TenantId"
-        }
-      ],
-      "kind": "value_object"
-    },
-    {
-      "class": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantId",
-      "source": "packages/nvl/core/support/src/Tenancy/ValueObjects/TenantId.php",
-      "constructor_fields": [
-        {
-          "name": "value",
-          "type": "string",
-          "visibility": "parameter",
-          "required": true
-        }
-      ],
-      "public_fields": [
-        {
-          "name": "value",
-          "type": "string"
-        }
-      ],
-      "kind": "value_object"
-    },
-    {
-      "class": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantJobEnvelope",
-      "source": "packages/nvl/core/support/src/Tenancy/ValueObjects/TenantJobEnvelope.php",
-      "constructor_fields": [
-        {
-          "name": "context",
-          "type": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantContextSnapshot",
-          "visibility": "public",
-          "required": true
-        },
-        {
-          "name": "version",
-          "type": "int",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "1"
-        }
-      ],
-      "public_fields": [
-        {
-          "name": "context",
-          "type": "Nvl\\Support\\Tenancy\\ValueObjects\\TenantContextSnapshot"
-        },
-        {
-          "name": "version",
-          "type": "int"
-        }
-      ],
-      "kind": "value_object"
     }
   ],
   "aliases": [],
@@ -357,10 +205,10 @@
     "manual_producers": "Use Nvl\\Support\\Events\\DomainEventDispatcher::dispatch($event, $writerConnection). Native Event::dispatch() is immediate and has no package interception."
   },
   "security_notes": [
-    "Value-free setting ID/key/revision and persisted tenant/ownership identity; context can carry actor ID, request ID, IP address and user agent. Treat request metadata as private. subject is the scalar nvl_setting reference. Private captured TenantJobEnvelope is available through tenantJobEnvelope(); it contains no model."
+    "Value-free setting ID, key, revision and operation; actor identity comes only from the explicit mutation principal. Optional bounded request metadata comes from a consumer provider. The private native OwnershipJobEnvelope contains scalar capture, no model."
   ],
-  "no_op_semantics": "Unchanged writes and absent resets emit nothing. Set/reset facts capture ownership and request context before commit; never resolve tenant context later.",
+  "no_op_semantics": "Equivalent set writes and resets of uncustomized rows emit nothing. Rolled back writes emit nothing; captured facts publish after the actual outer source connection commit.",
   "notes": [
-    "The context constructor parameter is nullable; the public context property is a non-null SettingAuditContextData defaulted during construction. subject is computed as SettingSubjectReferenceData(id), whose type is always nvl_setting. The private envelope default null supports construction compatibility; tenantJobEnvelope() requires a captured envelope."
+    "SettingChanged constructs a non-null SettingAuditContext and SettingSubjectReference from its ID. Production writers capture a native OwnershipJobEnvelope before commit; constructing an event without capture does not grant ownership authority."
   ]
 }

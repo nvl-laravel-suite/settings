@@ -5,20 +5,16 @@ declare(strict_types=1);
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Nvl\Settings\Actions\ListSettingsAction;
-use Nvl\Settings\Actions\SetSettingAction;
-use Nvl\Settings\Data\SettingListQueryData;
-use Nvl\Settings\Data\SettingMutationData;
-use Nvl\Settings\Data\SettingSubjectReferenceData;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Events\SettingChanged;
 use Nvl\Settings\Exceptions\InvalidDefinitionException;
 use Nvl\Settings\Exceptions\StaleSettingVersionException;
+use Nvl\Settings\Services\SettingReader;
 use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Support\DefinitionFileLoader;
 use Nvl\Settings\Support\DefinitionRepository;
-use Nvl\Settings\Support\SettingsRouteConfiguration;
-use Nvl\Settings\Testing\InteractsWithSettings;
+use Nvl\Settings\Support\SettingSubjectReference;
+use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
 
 uses(InteractsWithSettings::class);
 
@@ -34,7 +30,7 @@ it('exposes a stable value-free subject reference on setting change events', fun
         (new ReflectionMethod(SettingChanged::class, '__construct'))->getParameters(),
     );
 
-    expect($event->subject)->toBeInstanceOf(SettingSubjectReferenceData::class)
+    expect($event->subject)->toBeInstanceOf(SettingSubjectReference::class)
         ->and($event->subject->type)->toBe('nvl_setting')
         ->and($event->subject->id)->toBe('setting-123')
         ->and($event->subject->toArray())->toBe([
@@ -43,11 +39,11 @@ it('exposes a stable value-free subject reference on setting change events', fun
         ])
         ->and($parameters)->not->toContain('subject')
         ->and(property_exists($event, 'value'))->toBeFalse()
-        ->and(fn () => new SettingSubjectReferenceData('   '))
+        ->and(fn () => new SettingSubjectReference('   '))
         ->toThrow(InvalidArgumentException::class, 'between 1 and 100')
-        ->and(fn () => new SettingSubjectReferenceData(str_repeat('x', 101)))
+        ->and(fn () => new SettingSubjectReference(str_repeat('x', 101)))
         ->toThrow(InvalidArgumentException::class, 'between 1 and 100')
-        ->and(fn () => new SettingSubjectReferenceData("setting\0id"))
+        ->and(fn () => new SettingSubjectReference("setting\0id"))
         ->toThrow(InvalidArgumentException::class, 'without NUL bytes');
 });
 
@@ -257,46 +253,6 @@ it('validates discovery cache and management adoption failures', function (): vo
         expect($checks['schema.columns']->passed)->toBeFalse();
         Schema::drop('incomplete_consumer_settings');
 
-        config()->set([
-            'nvl-settings.storage.table' => 'settings',
-            'nvl-settings.management.enabled' => true,
-            'nvl-settings.management.path' => '../unsafe',
-        ]);
-        $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
-        expect($checks['management.routes']->passed)->toBeFalse();
-
-        config()->set([
-            'nvl-settings.management.path' => 'api/consumer/settings',
-            'nvl-settings.management.name' => 'consumer.settings',
-            'nvl-settings.management.middleware' => ['api'],
-            'nvl-settings.management.authorization_ability' => null,
-        ]);
-        $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
-        expect($checks['management.routes']->message)->toContain('authorization');
-
-        config()->set([
-            'nvl-settings.management.authorization_ability' => 'manage-settings',
-            'nvl-settings.management.middleware' => [],
-        ]);
-        $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
-        expect($checks['management.routes']->message)->toContain('middleware');
-
-        config()->set('nvl-settings.management.middleware', ['api']);
-        $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
-        expect($checks['management.routes']->message)->toContain('not registered');
-
-        config()->set('nvl-settings.management.path', 42);
-        expect(fn () => SettingsRouteConfiguration::path())
-            ->toThrow(InvalidArgumentException::class, 'must be a string');
-        config()->set('nvl-settings.management.path', '');
-        expect(fn () => SettingsRouteConfiguration::path())
-            ->toThrow(InvalidArgumentException::class, 'safe');
-        config()->set('nvl-settings.management.name', 42);
-        expect(fn () => SettingsRouteConfiguration::name())
-            ->toThrow(InvalidArgumentException::class, 'must be a string');
-        config()->set('nvl-settings.management.name', 'bad name');
-        expect(fn () => SettingsRouteConfiguration::name())
-            ->toThrow(InvalidArgumentException::class, 'safe');
     } finally {
         $filesystem->delete($cache);
         $filesystem->deleteDirectory($directory);
@@ -327,27 +283,21 @@ it('exercises filtered management reads and operational commands', function (): 
             'default' => str_repeat('label-', 12),
         ],
     ]);
-    $enabled = app(SetSettingAction::class)->execute(new SettingMutationData(
+    $enabled = settingsSetForTest(
         key: 'catalog.listing.enabled',
         value: true,
         expectedRevision: 0,
-    ));
-    app(SetSettingAction::class)->execute(new SettingMutationData(
+    );
+    settingsSetForTest(
         key: 'catalog.payload',
         value: ['mode' => 'consumer'],
         expectedRevision: 0,
-    ));
+    );
 
-    $page = app(ListSettingsAction::class)->execute(new SettingListQueryData(
-        namespace: 'catalog',
-        scope: 'listing',
-        search: 'needle',
-        page: 1,
-        perPage: 10,
-    ));
+    $page = app(SettingReader::class)->paginate(['namespace' => 'catalog', 'scope' => 'listing', 'search' => 'needle', 'page' => 1, 'per_page' => 10]);
 
-    expect($page->meta->total)->toBe(1)
-        ->and($page->items[0]['value']['revision'])->toBe($enabled->revision);
+    expect($page->total())->toBe(1)
+        ->and($page->items()[0]['value']['revision'])->toBe($enabled['revision']);
 
     $this->artisan('nvl:settings:list')->assertSuccessful();
     $this->artisan('nvl:settings:list', [
@@ -380,22 +330,22 @@ it('covers optimistic action updates and stale first writes', function (): void 
             'default' => 10,
         ],
     ]);
-    $first = app(SetSettingAction::class)->execute(new SettingMutationData(
+    $first = settingsSetForTest(
         key: 'branding.name',
         value: 'First',
         expectedRevision: 0,
-    ));
-    $second = app(SetSettingAction::class)->execute(new SettingMutationData(
+    );
+    $second = settingsSetForTest(
         key: 'branding.name',
         value: 'Second',
-        expectedRevision: $first->revision,
-    ));
+        expectedRevision: $first['revision'],
+    );
 
-    expect($second->value)->toBe('Second')
-        ->and($second->revision)->toBeGreaterThan($first->revision)
-        ->and(fn () => app(SetSettingAction::class)->execute(new SettingMutationData(
+    expect($second['value'])->toBe('Second')
+        ->and($second['revision'])->toBeGreaterThan($first['revision'])
+        ->and(fn () => settingsSetForTest(
             key: 'catalog.unwritten',
             value: 20,
             expectedRevision: 2,
-        )))->toThrow(StaleSettingVersionException::class);
+        ))->toThrow(StaleSettingVersionException::class);
 });

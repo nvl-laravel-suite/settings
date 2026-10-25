@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-namespace Nvl\Settings\Actions;
+namespace Nvl\Settings\Services;
 
-use Nvl\Settings\Contracts\ValidateSettingsSourcesContract;
-use Nvl\Settings\Data\SettingsSourceStatusData;
 use Nvl\Settings\Support\DefinitionRepository;
 
 /**
@@ -13,7 +11,7 @@ use Nvl\Settings\Support\DefinitionRepository;
  *
  * @api
  */
-final readonly class ValidateSettingsSourcesAction implements ValidateSettingsSourcesContract
+final readonly class SettingsSourceValidator
 {
     /**
      * Create the source-validation action.
@@ -22,8 +20,10 @@ final readonly class ValidateSettingsSourcesAction implements ValidateSettingsSo
 
     /**
      * Return a sanitized deterministic discovery and definition status.
+     *
+     * @return array{valid: bool, source_count: int, definition_count: int, namespaces: list<string>, source_files: list<string>, checksum: string, error: null}
      */
-    public function execute(): SettingsSourceStatusData
+    public function inspect(): array
     {
         $map = $this->definitions->refresh();
         $definitions = $this->definitions->all();
@@ -35,14 +35,6 @@ final readonly class ValidateSettingsSourcesAction implements ValidateSettingsSo
         sort($namespaces);
         sort($sourceFiles);
 
-        return new SettingsSourceStatusData(
-            valid: true,
-            sourceCount: count($map),
-            definitionCount: count($definitions),
-            namespaces: $namespaces,
-            sourceFiles: $sourceFiles,
-            checksum: $this->definitions->checksum($map),
-            error: null,
-        );
+        return ['valid' => true, 'source_count' => count($map), 'definition_count' => count($definitions), 'namespaces' => $namespaces, 'source_files' => $sourceFiles, 'checksum' => $this->definitions->checksum($map), 'error' => null];
     }
 }

@@ -9,7 +9,7 @@ use Illuminate\Contracts\Foundation\MaintenanceMode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Nvl\Data\Providers\DataServiceProvider;
+use Illuminate\Support\Facades\Gate;
 use Nvl\Ownership\Contracts\CentralAccess;
 use Nvl\Ownership\Contracts\OwnerAccess;
 use Nvl\Ownership\Contracts\OwnershipAdoptionAccess;
@@ -30,7 +30,7 @@ abstract class OwnershipTestCase extends TestCase
     /** @return list<class-string> */
     protected function getPackageProviders($app): array
     {
-        return [LocaleServiceProvider::class, SupportServiceProvider::class, DataServiceProvider::class, OwnershipServiceProvider::class, SettingsServiceProvider::class];
+        return [LocaleServiceProvider::class, SupportServiceProvider::class, OwnershipServiceProvider::class, SettingsServiceProvider::class];
     }
 
     /** Configure owned package roots before immutable resource registration. */
@@ -41,9 +41,9 @@ abstract class OwnershipTestCase extends TestCase
             'nvl-core.owners' => [OwnershipCompany::class, OwnershipActor::class],
             'nvl-ownership.enabled' => true, 'nvl-ownership.migrations.enabled' => false,
             'nvl-ownership.central_operations' => ['settings-config'],
-            'nvl-tenancy.enabled' => false,
             'nvl-settings.discovery.paths' => [__DIR__.'/Fixtures/settings'],
             'nvl-settings.discovery.cache' => false,
+            'nvl-settings.management.authorization_ability' => 'manage-settings',
         ]);
         if (getenv('NVL_OWNERSHIP_TEST_DRIVER') === 'pgsql') {
             $database = getenv('NVL_OWNERSHIP_TEST_DATABASE');
@@ -70,6 +70,7 @@ abstract class OwnershipTestCase extends TestCase
         }
         OwnershipCompany::query()->insert([['id' => 7], ['id' => 8]]);
         OwnershipActor::query()->create(['id' => 1]);
+        Gate::define('manage-settings', static fn (OwnershipActor $actor): bool => $actor->getKey() === 1);
         foreach (glob(__DIR__.'/../database/migrations/*.php') ?: [] as $path) {
             (require $path)->up();
         }

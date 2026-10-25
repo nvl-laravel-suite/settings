@@ -86,13 +86,9 @@ final readonly class SettingCache
         sort($hashes);
 
         $attributes = $this->boundary->attributes('settings.values');
-        $legacy = $attributes['ownership_key'] ?? 'disabled';
-        if (! is_string($legacy)) {
-            throw new OwnershipViolation('Cache partitions require a canonical string discriminator.');
-        }
         $ownership = isset($attributes['owner_scope_key'])
             ? $this->boundary->key('settings.values', 'records')
-            : $legacy;
+            : 'disabled';
 
         return $this->makeIdentity($connection->getName() ?? 'default', $ownership, $hashes);
     }
@@ -106,18 +102,16 @@ final readonly class SettingCache
         );
         sort($hashes);
 
-        $rawOwnership = $setting->getRawOriginal('ownership_key');
         $scope = $setting->getRawOriginal('owner_scope_key');
         if ($scope !== null) {
             if ($scope !== ($this->boundary->attributes('settings.values')['owner_scope_key'] ?? null)) {
                 throw new OwnershipViolation('Cache invalidation must capture the persisted record partition.');
             }
-            $rawOwnership = $this->boundary->key('settings.values', 'records');
         }
 
         return $this->makeIdentity(
             $setting->getConnection()->getName() ?? 'default',
-            is_string($rawOwnership) && $rawOwnership !== '' ? $rawOwnership : 'disabled',
+            $scope !== null ? $this->boundary->key('settings.values', 'records') : 'disabled',
             $hashes,
         );
     }
@@ -200,9 +194,7 @@ final readonly class SettingCache
             'created_at',
             'updated_at',
         ];
-        if (config('nvl-tenancy.enabled') === true) {
-            $required = [...$required, 'tenant_id', 'ownership_key'];
-        }
+        $required = [...$required, ...array_keys($this->boundary->attributes('settings.values'))];
 
         foreach ($payload as $attributes) {
             if (! is_array($attributes)

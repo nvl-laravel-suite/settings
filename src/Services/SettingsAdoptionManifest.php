@@ -11,7 +11,7 @@ use Nvl\Settings\Support\DefinitionRepository;
 /**
  * Validates and normalizes a bounded legacy-to-canonical Settings adoption manifest.
  *
- * @phpstan-type NormalizedManifest array{source_connection: string|null, source_table: string, key_column: string, value_column: string, expected_count: int, key_replacements: array<string, string>}
+ * @phpstan-type NormalizedManifest array{source_connection: string|null, source_table: string, key_column: string, value_column: string, expected_count: int, key_replacements: array<string, string>, expected_revisions: array<string, int>}
  */
 final readonly class SettingsAdoptionManifest
 {
@@ -36,6 +36,7 @@ final readonly class SettingsAdoptionManifest
             'value_column',
             'expected_count',
             'key_replacements',
+            'expected_revisions',
         ]);
 
         if ($unknown !== []) {
@@ -113,6 +114,16 @@ final readonly class SettingsAdoptionManifest
             $targets[$targetKey] = true;
         }
 
+        $revisions = $manifest['expected_revisions'] ?? [];
+        if (! is_array($revisions) || ($revisions !== [] && array_is_list($revisions))) {
+            throw new InvalidArgumentException('Settings adoption expected_revisions must be a target-to-revision JSON object.');
+        }
+        foreach ($revisions as $targetKey => $revision) {
+            if (! is_string($targetKey) || ! isset($targets[$targetKey]) || ! is_int($revision) || $revision < 0) {
+                throw new InvalidArgumentException('Settings adoption expected_revisions must contain mapped target keys and nonnegative revisions.');
+            }
+        }
+
         $target = new Setting;
         $targetConnection = $target->getConnectionName() ?? config('database.default');
 
@@ -129,6 +140,7 @@ final readonly class SettingsAdoptionManifest
             'value_column' => $valueColumn,
             'expected_count' => $expectedCount,
             'key_replacements' => $normalized,
+            'expected_revisions' => $revisions,
         ];
     }
 

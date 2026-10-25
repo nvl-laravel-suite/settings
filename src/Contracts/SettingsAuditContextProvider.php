@@ -4,17 +4,9 @@ declare(strict_types=1);
 
 namespace Nvl\Settings\Contracts;
 
-use Nvl\Settings\Data\SettingAuditContextData;
-
-/**
- * Supplies value-free actor and request context for setting mutation events.
- *
- * @api
- */
+/** Supplies bounded transport metadata without deciding mutation attribution. @api */
 interface SettingsAuditContextProvider
 {
-    /**
-     * Capture the current mutation context before the transaction commits.
-     */
-    public function current(): SettingAuditContextData;
+    /** @return array{request_id?: ?string, ip_address?: ?string, user_agent?: ?string} */
+    public function metadata(): array;
 }

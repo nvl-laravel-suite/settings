@@ -9,7 +9,7 @@ use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
-use Nvl\Settings\Testing\InteractsWithSettings;
+use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
 use Nvl\Settings\Tests\SettingsCacheTestCase;
 
 uses(InteractsWithSettings::class);
@@ -26,7 +26,7 @@ it('caches only primitive setting payloads on serialized stores', function (): v
     $repository = app(SettingRepository::class);
 
     try {
-        $repository->set('catalog.enabled', true);
+        settingsSetForTest('catalog.enabled', true);
 
         expect($repository->get('catalog.enabled'))->toBeTrue();
 
@@ -50,7 +50,7 @@ it('rebuilds malformed primitive cache payloads before model hydration', functio
     config()->set('nvl-settings.cache.store', 'array');
     config()->set('nvl-settings.cache.key', $key);
     $repository = app(SettingRepository::class);
-    $repository->set('catalog.enabled', true);
+    settingsSetForTest('catalog.enabled', true);
     $repository->get('catalog.enabled');
     $malformed = Cache::store('array')->get($key);
     $malformed[0]['value'] = 1.25;
@@ -80,7 +80,7 @@ it('invalidates cached settings only after the outer transaction commits', funct
         'catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
     $repository = app(SettingRepository::class);
-    $repository->set('catalog.enabled', true);
+    settingsSetForTest('catalog.enabled', true);
     expect($repository->get('catalog.enabled'))->toBeTrue();
     $key = config('nvl-settings.cache.key');
     $connection = DB::connection((new Setting)->getConnectionName());
@@ -118,7 +118,7 @@ it('does not publish uncommitted settings into an empty shared cache', function 
     $connection->beginTransaction();
 
     try {
-        $repository->set('catalog.enabled', true);
+        settingsSetForTest('catalog.enabled', true);
         expect($repository->get('catalog.enabled'))->toBeTrue()
             ->and(Cache::store(config('nvl-settings.cache.store'))->has($key))->toBeFalse();
     } finally {

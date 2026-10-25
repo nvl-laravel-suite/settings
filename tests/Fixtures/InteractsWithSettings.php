@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Nvl\Settings\Testing;
+namespace Nvl\Settings\Tests\Fixtures;
 
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Services\SettingCache;
