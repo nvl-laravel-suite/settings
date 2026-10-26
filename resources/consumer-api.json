@@ -236,16 +236,42 @@
             "kind": "class",
             "file": "src/Models/Setting.php",
             "methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
+                "bootHasOwnership",
+                "delete",
+                "fresh",
+                "fullKey",
+                "getConnectionName",
+                "getTable",
+                "hasActiveOverride",
+                "isCustomised",
+                "newQueryForRestoration",
+                "ownershipDefinition",
+                "refresh",
+                "refreshForUpdate",
+                "resolved",
+                "save"
             ],
-            "properties": [],
+            "properties": [
+                "created_at",
+                "definition_hash",
+                "fallback",
+                "has_override",
+                "id",
+                "key",
+                "metadata",
+                "namespace",
+                "orphaned_at",
+                "owner_reference",
+                "owner_scope_key",
+                "revision",
+                "scope",
+                "synced_at",
+                "type",
+                "updated_at",
+                "valid_from",
+                "valid_until",
+                "value"
+            ],
             "constants": []
         },
         "Nvl\\Settings\\Rules\\IntegerListBetween": {
@@ -427,25 +453,5 @@
             "properties": [],
             "constants": []
         }
-    },
-    "models": {
-        "Nvl\\Settings\\Models\\Setting": {
-            "read": [],
-            "identity_methods": [
-                "getKey",
-                "getKeyName",
-                "getMorphClass",
-                "getRouteKey",
-                "getRouteKeyName",
-                "is",
-                "isNot",
-                "relationLoaded"
-            ],
-            "capability_relations": []
-        }
-    },
-    "capability_relations": {},
-    "tables": {
-        "settings": "nvl_settings_settings"
     }
 }

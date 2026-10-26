@@ -1,214 +1,212 @@
 {
-  "schema_version": 1,
-  "package": "nvl/settings",
-  "documentation": "docs/events.md",
-  "implementation_status": "implemented; owning tests exercise native publication and payload shape",
-  "events": [
-    {
-      "class": "Nvl\\Settings\\Events\\SettingChanged",
-      "source": "packages/nvl/settings/src/Events/SettingChanged.php",
-      "constructor_fields": [
+    "schema_version": 1,
+    "package": "nvl/settings",
+    "documentation": "docs/events.md",
+    "implementation_status": "implemented; owning tests exercise native publication and payload shape",
+    "events": [
         {
-          "name": "id",
-          "type": "string",
-          "visibility": "public",
-          "required": true
-        },
-        {
-          "name": "key",
-          "type": "string",
-          "visibility": "public",
-          "required": true
-        },
-        {
-          "name": "revision",
-          "type": "int",
-          "visibility": "public",
-          "required": true
-        },
-        {
-          "name": "operation",
-          "type": "string",
-          "visibility": "public",
-          "required": true
-        },
-        {
-          "name": "context",
-          "type": "?Nvl\\Settings\\Support\\SettingAuditContext",
-          "visibility": "parameter",
-          "required": false,
-          "default_expression": "null"
-        },
-        {
-          "name": "ownershipEnvelope",
-          "type": "?Nvl\\Support\\Ownership\\ValueObjects\\OwnershipJobEnvelope",
-          "visibility": "private",
-          "required": false,
-          "default_expression": "null"
-        },
-        {
-          "name": "schemaVersion",
-          "type": "int",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "1"
+            "class": "Nvl\\Settings\\Events\\SettingChanged",
+            "source": "packages/nvl/settings/src/Events/SettingChanged.php",
+            "constructor_fields": [
+                {
+                    "name": "id",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "key",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "revision",
+                    "type": "int",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "operation",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                },
+                {
+                    "name": "context",
+                    "type": "?Nvl\\Settings\\Support\\SettingAuditContext",
+                    "visibility": "parameter",
+                    "required": false,
+                    "default_expression": "NULL"
+                },
+                {
+                    "name": "ownershipEnvelope",
+                    "type": "?Nvl\\Support\\Ownership\\ValueObjects\\OwnershipJobEnvelope",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                },
+                {
+                    "name": "schemaVersion",
+                    "type": "int",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "1"
+                }
+            ],
+            "public_fields": [
+                {
+                    "name": "context",
+                    "type": "Nvl\\Settings\\Support\\SettingAuditContext"
+                },
+                {
+                    "name": "subject",
+                    "type": "Nvl\\Settings\\Support\\SettingSubjectReference"
+                },
+                {
+                    "name": "id",
+                    "type": "string"
+                },
+                {
+                    "name": "key",
+                    "type": "string"
+                },
+                {
+                    "name": "revision",
+                    "type": "int"
+                },
+                {
+                    "name": "operation",
+                    "type": "string"
+                },
+                {
+                    "name": "schemaVersion",
+                    "type": "int"
+                }
+            ],
+            "kind": "value_object",
+            "schema_version": 1,
+            "trigger": "Value-free runtime setting mutation.",
+            "aliases": [],
+            "producers": [
+                {
+                    "path": "packages/nvl/settings/src/Services/SettingWriter.php",
+                    "trigger": "Value-free runtime setting mutation."
+                }
+            ],
+            "security_notes": [
+                "Value-free setting ID, key, revision and operation; actor identity comes only from the explicit mutation principal. Optional bounded request metadata comes from a consumer provider. The private native OwnershipJobEnvelope contains scalar capture, no model."
+            ],
+            "no_op_semantics": "Equivalent set writes and resets of uncustomized rows emit nothing. Rolled back writes emit nothing; captured facts publish after the actual outer source connection commit."
         }
-      ],
-      "public_fields": [
+    ],
+    "value_types": [
         {
-          "name": "id",
-          "type": "string"
+            "class": "Nvl\\Settings\\Support\\SettingAuditContext",
+            "source": "packages/nvl/settings/src/Support/SettingAuditContext.php",
+            "constructor_fields": [
+                {
+                    "name": "actorType",
+                    "type": "?string",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                },
+                {
+                    "name": "actorId",
+                    "type": "?string",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                },
+                {
+                    "name": "requestId",
+                    "type": "?string",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                },
+                {
+                    "name": "ipAddress",
+                    "type": "?string",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                },
+                {
+                    "name": "userAgent",
+                    "type": "?string",
+                    "visibility": "public",
+                    "required": false,
+                    "default_expression": "NULL"
+                }
+            ],
+            "public_fields": [
+                {
+                    "name": "actorType",
+                    "type": "?string"
+                },
+                {
+                    "name": "actorId",
+                    "type": "?string"
+                },
+                {
+                    "name": "requestId",
+                    "type": "?string"
+                },
+                {
+                    "name": "ipAddress",
+                    "type": "?string"
+                },
+                {
+                    "name": "userAgent",
+                    "type": "?string"
+                }
+            ],
+            "kind": "value_object"
         },
         {
-          "name": "key",
-          "type": "string"
-        },
-        {
-          "name": "revision",
-          "type": "int"
-        },
-        {
-          "name": "operation",
-          "type": "string"
-        },
-        {
-          "name": "context",
-          "type": "Nvl\\Settings\\Support\\SettingAuditContext"
-        },
-        {
-          "name": "schemaVersion",
-          "type": "int"
-        },
-        {
-          "name": "subject",
-          "type": "Nvl\\Settings\\Support\\SettingSubjectReference"
+            "class": "Nvl\\Settings\\Support\\SettingSubjectReference",
+            "source": "packages/nvl/settings/src/Support/SettingSubjectReference.php",
+            "constructor_fields": [
+                {
+                    "name": "id",
+                    "type": "string",
+                    "visibility": "public",
+                    "required": true
+                }
+            ],
+            "public_fields": [
+                {
+                    "name": "type",
+                    "type": "string"
+                },
+                {
+                    "name": "id",
+                    "type": "string"
+                }
+            ],
+            "kind": "value_object",
+            "constants": {
+                "type": "nvl_setting"
+            }
         }
-      ],
-      "kind": "value_object",
-      "schema_version": 1,
-      "trigger": "Value-free runtime setting mutation.",
-      "aliases": [],
-      "producers": [
-        {
-          "path": "packages/nvl/settings/src/Services/SettingWriter.php",
-          "trigger": "Committed set/reset mutation.",
-          "connection": "$connection = $this->database->connection((new Setting)->getConnectionName())",
-          "construction_expression": "new SettingChanged($setting->getKey(), $key, $setting->revision, $operation, $context, OwnershipJobEnvelope::capture($this->ownershipContext))"
-        }
-      ],
-      "security_notes": [
-        "Value-free setting ID, key, revision and operation; actor identity comes only from the explicit mutation principal. Optional bounded request metadata comes from a consumer provider. The private native OwnershipJobEnvelope contains scalar capture, no model."
-      ],
-      "no_op_semantics": "Equivalent set writes and resets of uncustomized rows emit nothing. Rolled back writes emit nothing; captured facts publish after the actual outer source connection commit."
-    }
-  ],
-  "value_types": [
-    {
-      "class": "Nvl\\Settings\\Support\\SettingAuditContext",
-      "source": "packages/nvl/settings/src/Support/SettingAuditContext.php",
-      "constructor_fields": [
-        {
-          "name": "actorType",
-          "type": "?string",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "null"
-        },
-        {
-          "name": "actorId",
-          "type": "?string",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "null"
-        },
-        {
-          "name": "requestId",
-          "type": "?string",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "null"
-        },
-        {
-          "name": "ipAddress",
-          "type": "?string",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "null"
-        },
-        {
-          "name": "userAgent",
-          "type": "?string",
-          "visibility": "public",
-          "required": false,
-          "default_expression": "null"
-        }
-      ],
-      "public_fields": [
-        {
-          "name": "actorType",
-          "type": "?string"
-        },
-        {
-          "name": "actorId",
-          "type": "?string"
-        },
-        {
-          "name": "requestId",
-          "type": "?string"
-        },
-        {
-          "name": "ipAddress",
-          "type": "?string"
-        },
-        {
-          "name": "userAgent",
-          "type": "?string"
-        }
-      ],
-      "kind": "value_object"
+    ],
+    "aliases": [],
+    "publication": {
+        "publication": "The native host dispatcher receives the captured event after the supplied source connection outer commit, or immediately when that connection has no active transaction.",
+        "rollback": "Callbacks attach to the matching native connection and current nesting record; native outer/savepoint rollback discards the corresponding callbacks.",
+        "registration_failure": "Missing source transaction records fail before commit; Mail Notifications reports and drops unusable observations.",
+        "host_policy": "Host after-commit listeners and queue after_commit policies can add their own deferral after publication. Host transaction infrastructure and dispatcher bindings are preserved.",
+        "delivery_limit": "Local callbacks are not an outbox. Process exit between commit and callback can lose delivery; no crash durability or exactly-once delivery is promised.",
+        "cardinality": "One canonical object is dispatched per qualifying producer call. This is local publication, not cross-process deduplication or a guarantee that repeated observations are unique.",
+        "manual_producers": "Use Nvl\\Support\\Events\\DomainEventDispatcher::dispatch($event, $writerConnection). Native Event::dispatch() is immediate and has no package interception."
     },
-    {
-      "class": "Nvl\\Settings\\Support\\SettingSubjectReference",
-      "source": "packages/nvl/settings/src/Support/SettingSubjectReference.php",
-      "constructor_fields": [
-        {
-          "name": "id",
-          "type": "string",
-          "visibility": "public",
-          "required": true
-        }
-      ],
-      "public_fields": [
-        {
-          "name": "id",
-          "type": "string"
-        },
-        {
-          "name": "type",
-          "type": "string"
-        }
-      ],
-      "kind": "value_object",
-      "constants": {
-        "type": "nvl_setting"
-      }
-    }
-  ],
-  "aliases": [],
-  "publication": {
-    "publication": "The native host dispatcher receives the captured event after the supplied source connection outer commit, or immediately when that connection has no active transaction.",
-    "rollback": "Callbacks attach to the matching native connection and current nesting record; native outer/savepoint rollback discards the corresponding callbacks.",
-    "registration_failure": "Missing source transaction records fail before commit; Mail Notifications reports and drops unusable observations.",
-    "host_policy": "Host after-commit listeners and queue after_commit policies can add their own deferral after publication. Host transaction infrastructure and dispatcher bindings are preserved.",
-    "delivery_limit": "Local callbacks are not an outbox. Process exit between commit and callback can lose delivery; no crash durability or exactly-once delivery is promised.",
-    "cardinality": "One canonical object is dispatched per qualifying producer call. This is local publication, not cross-process deduplication or a guarantee that repeated observations are unique.",
-    "manual_producers": "Use Nvl\\Support\\Events\\DomainEventDispatcher::dispatch($event, $writerConnection). Native Event::dispatch() is immediate and has no package interception."
-  },
-  "security_notes": [
-    "Value-free setting ID, key, revision and operation; actor identity comes only from the explicit mutation principal. Optional bounded request metadata comes from a consumer provider. The private native OwnershipJobEnvelope contains scalar capture, no model."
-  ],
-  "no_op_semantics": "Equivalent set writes and resets of uncustomized rows emit nothing. Rolled back writes emit nothing; captured facts publish after the actual outer source connection commit.",
-  "notes": [
-    "SettingChanged constructs a non-null SettingAuditContext and SettingSubjectReference from its ID. Production writers capture a native OwnershipJobEnvelope before commit; constructing an event without capture does not grant ownership authority."
-  ]
+    "security_notes": [
+        "Value-free setting ID, key, revision and operation; actor identity comes only from the explicit mutation principal. Optional bounded request metadata comes from a consumer provider. The private native OwnershipJobEnvelope contains scalar capture, no model."
+    ],
+    "no_op_semantics": "Equivalent set writes and resets of uncustomized rows emit nothing. Rolled back writes emit nothing; captured facts publish after the actual outer source connection commit.",
+    "notes": [
+        "SettingChanged constructs a non-null SettingAuditContext and SettingSubjectReference from its ID. Production writers capture a native OwnershipJobEnvelope before commit; constructing an event without capture does not grant ownership authority."
+    ]
 }
