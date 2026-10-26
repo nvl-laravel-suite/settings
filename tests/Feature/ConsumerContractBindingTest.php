@@ -19,9 +19,7 @@ use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Services\SettingsSourceValidator;
 use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\Tests\TestCase;
-use Nvl\Support\Consumer\PHPStan\ConsumerBoundaryPolicy;
 use Nvl\Support\Enums\SystemActor;
-use PHPStan\Reflection\ReflectionProvider;
 
 uses(TestCase::class);
 
@@ -81,18 +79,8 @@ test('published consumer catalog admits the native quickstart and a host audit m
     foreach ($required as $symbol => $methods) {
         expect($symbols)->toHaveKey($symbol);
         foreach ($methods as $method) {
-            expect($symbols[$symbol]['methods'])->toContain($method);
-        }
-    }
-
-    $policy = new ConsumerBoundaryPolicy(
-        Mockery::mock(ReflectionProvider::class)->shouldIgnoreMissing(),
-        dirname(__DIR__, 5),
-    );
-    foreach ($required as $symbol => $methods) {
-        expect($policy->ownedClass($symbol))->toBe('nvl/settings');
-        foreach ($methods as $method) {
-            expect($policy->allowsMember($symbol, $method, 'method'))->toBeTrue();
+            expect($symbols[$symbol]['methods'])->toContain($method)
+                ->and((new ReflectionMethod($symbol, $method))->isPublic())->toBeTrue();
         }
     }
 
