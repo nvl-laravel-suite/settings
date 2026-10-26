@@ -12,6 +12,8 @@ use Nvl\Settings\Support\DefinitionRepository;
  * Validates and normalizes a bounded legacy-to-canonical Settings adoption manifest.
  *
  * @phpstan-type NormalizedManifest array{source_connection: string|null, source_table: string, key_column: string, value_column: string, expected_count: int, key_replacements: array<string, string>, expected_revisions: array<string, int>}
+ *
+ * @internal
  */
 final readonly class SettingsAdoptionManifest
 {

@@ -14,6 +14,8 @@ use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
 /**
  * Caches setting records as primitive attributes and invalidates them after commits.
+ *
+ * @internal
  */
 final readonly class SettingCache
 {

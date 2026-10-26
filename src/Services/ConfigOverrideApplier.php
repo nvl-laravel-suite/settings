@@ -10,6 +10,8 @@ use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 
 /**
  * Applies explicitly mapped effective settings to Laravel configuration.
+ *
+ * @internal
  */
 final readonly class ConfigOverrideApplier
 {

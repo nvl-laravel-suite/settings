@@ -64,14 +64,14 @@ test('enabled management routes authorize typed reads and optimistic writes', fu
 
     $this->putJson('/api/internal/runtime-settings/interface.theme', [
         'value' => 'dark',
-        'expectedRevision' => 0,
+        'expected_revision' => 0,
     ])
         ->assertOk()
         ->assertJsonPath('data.value', 'dark')
         ->assertJsonPath('data.revision', 1);
 
     $this->deleteJson('/api/internal/runtime-settings/interface.theme', [
-        'expectedRevision' => 1,
+        'expected_revision' => 1,
     ])
         ->assertOk()
         ->assertJsonPath('data.value', 'light')
@@ -99,11 +99,11 @@ test('management listing remains bounded with large definition sets', function (
 
     app(DefinitionRepository::class)->fake($definitions);
 
-    $this->getJson('/api/internal/runtime-settings?perPage=25&page=2')
+    $this->getJson('/api/internal/runtime-settings?per_page=25&page=2')
         ->assertOk()
         ->assertJsonCount(25, 'data.items')
         ->assertJsonPath('data.meta.currentPage', 2)
-        ->assertJsonPath('data.meta.perPage', 25)
+        ->assertJsonPath('data.meta.per_page', 25)
         ->assertJsonPath('data.meta.total', 501);
 });
 
@@ -136,18 +136,18 @@ test('management routes return stable unknown and stale error contracts', functi
 
     $this->putJson('/api/internal/runtime-settings/interface.theme', [
         'value' => 'dark',
-        'expectedRevision' => 0,
+        'expected_revision' => 0,
     ])->assertOk();
 
     $this->putJson('/api/internal/runtime-settings/interface.theme', [
         'value' => 'light',
-        'expectedRevision' => 0,
+        'expected_revision' => 0,
     ])
         ->assertConflict()
         ->assertJsonPath('error.code', 'stale_setting_revision');
 
     $this->deleteJson('/api/internal/runtime-settings/interface.locale', [
-        'expectedRevision' => 1,
+        'expected_revision' => 1,
     ])
         ->assertNotFound()
         ->assertJsonPath('error.code', 'setting_override_not_found');
@@ -169,12 +169,12 @@ test('management writes require an explicit value and optimistic revision', func
     ]);
 
     $this->putJson('/api/internal/runtime-settings/interface.theme', [
-        'expectedRevision' => 0,
+        'expected_revision' => 0,
     ])->assertUnprocessable()
         ->assertJsonValidationErrors('value');
 
     $this->putJson('/api/internal/runtime-settings/interface.theme', [
         'value' => 'dark',
     ])->assertUnprocessable()
-        ->assertJsonValidationErrors('expectedRevision');
+        ->assertJsonValidationErrors('expected_revision');
 });

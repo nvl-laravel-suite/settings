@@ -8,7 +8,11 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Support\Ownership\Contracts\OwnershipWriter;
 
-/** Creates a raw serialized setting inside the canonical writer and a race-safe savepoint. @internal */
+/**
+ * Creates a raw serialized setting inside the canonical writer and a race-safe savepoint.
+ *
+ * @internal
+ */
 final readonly class SettingCreator
 {
     /** Keep persistence independent of the optional enforcing runtime. */

@@ -30,7 +30,7 @@ final readonly class SettingReader
         private OwnershipBoundary $boundary,
     ) {}
 
-    /** @return array<string, mixed> Effective value, source and revision metadata. */
+    /** @return Resolved Effective value, source and revision metadata. */
     public function get(string $key): array
     {
         $definition = $this->definitions->get($key);
@@ -41,7 +41,7 @@ final readonly class SettingReader
 
     /**
      * @param  array<array-key, mixed>  $keys  Must be a list of at most 500 strings.
-     * @return list<array<string, mixed>>
+     * @return list<Resolved>
      */
     public function getMany(array $keys): array
     {
@@ -71,7 +71,7 @@ final readonly class SettingReader
     /**
      * Filter keys: namespace, scope, search, page and per_page. Returns definition/value records.
      *
-     * @param  array<string, mixed>  $query
+     * @param  array{namespace?: string|null, scope?: string|null, search?: string|null, page?: int, per_page?: int}  $query
      * @return LengthAwarePaginator<int, array{definition: DefinitionRecord, value: Resolved}>
      */
     public function paginate(array $query = []): LengthAwarePaginator

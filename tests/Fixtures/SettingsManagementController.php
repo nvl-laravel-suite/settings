@@ -41,15 +41,11 @@ final class SettingsManagementController extends Controller
     {
         $this->authorization->authorize($request->user() ?? abort(401), SettingAbility::List);
         $query = $request->query();
-        if (array_key_exists('perPage', $query)) {
-            $query['per_page'] = $query['perPage'];
-            unset($query['perPage']);
-        }
         $page = $reader->paginate($query);
 
         return response()->json(['data' => [
             'items' => $this->camel($page->items()),
-            'meta' => ['currentPage' => $page->currentPage(), 'perPage' => $page->perPage(),
+            'meta' => ['currentPage' => $page->currentPage(), 'per_page' => $page->perPage(),
                 'lastPage' => $page->lastPage(), 'total' => $page->total()],
         ]]);
     }
@@ -67,7 +63,7 @@ final class SettingsManagementController extends Controller
     public function update(string $key, Request $request, SettingWriter $writer): JsonResponse
     {
         $input = $request->validate([
-            'value' => ['present'], 'expectedRevision' => ['required', 'integer', 'min:0'],
+            'value' => ['present'], 'expected_revision' => ['required', 'integer', 'min:0'],
             'validFrom' => ['sometimes', 'nullable', 'date'], 'validUntil' => ['sometimes', 'nullable', 'date'],
         ]);
         $options = [];
@@ -78,7 +74,7 @@ final class SettingsManagementController extends Controller
             $options['valid_until'] = $input['validUntil'];
         }
         try {
-            $result = $writer->set($key, $input['value'], $request->user() ?? abort(401), (int) $input['expectedRevision'], $options);
+            $result = $writer->set($key, $input['value'], $request->user() ?? abort(401), (int) $input['expected_revision'], $options);
 
             return response()->json(['data' => $this->camel($result)]);
         } catch (UnknownSettingException $exception) {
@@ -90,9 +86,9 @@ final class SettingsManagementController extends Controller
 
     public function reset(string $key, Request $request, SettingWriter $writer): JsonResponse
     {
-        $input = $request->validate(['expectedRevision' => ['required', 'integer', 'min:1']]);
+        $input = $request->validate(['expected_revision' => ['required', 'integer', 'min:1']]);
         try {
-            $result = $writer->reset($key, $request->user() ?? abort(401), (int) $input['expectedRevision']);
+            $result = $writer->reset($key, $request->user() ?? abort(401), (int) $input['expected_revision']);
 
             return response()->json(['data' => $this->camel($result)]);
         } catch (UnknownSettingException $exception) {

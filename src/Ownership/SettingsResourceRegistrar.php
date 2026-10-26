@@ -9,7 +9,11 @@ use Nvl\Support\Ownership\Services\OwnershipResourceRegistry;
 use Nvl\Support\Ownership\ValueObjects\OwnershipDefinition;
 use Nvl\Support\Ownership\ValueObjects\OwnershipResourceDefinition;
 
-/** Declares internal captured values while code definitions remain global. @internal */
+/**
+ * Declares internal captured values while code definitions remain global.
+ *
+ * @internal
+ */
 final readonly class SettingsResourceRegistrar
 {
     /** Compile the explicit deployment classification before the graph freezes. */

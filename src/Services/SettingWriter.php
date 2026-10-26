@@ -42,6 +42,8 @@ use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
  * pruning, and cache invalidation form one reusable atomic write boundary.
  *
  * @api
+ *
+ * @phpstan-import-type Resolved from SettingRecord
  */
 final readonly class SettingWriter
 {
@@ -66,7 +68,7 @@ final readonly class SettingWriter
      * Options accept only valid_from and valid_until; omission preserves an existing window and null clears it.
      *
      * @param  array{valid_from?: DateTimeInterface|string|null, valid_until?: DateTimeInterface|string|null}  $options
-     * @return array<string, mixed>
+     * @return Resolved
      */
     public function set(
         string $key,
@@ -172,7 +174,7 @@ final readonly class SettingWriter
     }
 
     /** Clear an override only at its exact revision and return its resolved fallback metadata.
-     * @return array<string, mixed>
+     * @return Resolved
      */
     public function reset(string $key, Authenticatable|SystemActor $actor, int $expectedRevision): array
     {

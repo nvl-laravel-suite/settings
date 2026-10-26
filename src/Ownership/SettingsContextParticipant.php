@@ -9,7 +9,11 @@ use Nvl\Settings\Services\PlatformSettingsRuntime;
 use Nvl\Support\Ownership\Contracts\OwnershipContextParticipant;
 use Nvl\Support\Ownership\ValueObjects\OwnershipSnapshot;
 
-/** Restores central config projections across nested and retained ownership workflows. @internal */
+/**
+ * Restores central config projections across nested and retained ownership workflows.
+ *
+ * @internal
+ */
 final readonly class SettingsContextParticipant implements OwnershipContextParticipant
 {
     /** Resolve this lifecycle's projection stack through the container. */

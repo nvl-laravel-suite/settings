@@ -14,7 +14,11 @@ use Nvl\Ownership\ValueObjects\OwnershipVerification;
 use Nvl\Settings\Models\Setting;
 use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
 
-/** Adopts exact reviewed Settings rows and their partitioned natural identities. @internal */
+/**
+ * Adopts exact reviewed Settings rows and their partitioned natural identities.
+ *
+ * @internal
+ */
 final readonly class SettingsAdoptionAdapter implements OwnershipAdoptionAdapter
 {
     /** Resolve maintenance-only mapping and schema capabilities. */

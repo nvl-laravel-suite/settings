@@ -6,7 +6,7 @@ namespace Nvl\Settings\Exceptions;
 
 /**
  * @api
-
+ *
  * Raised when a setting source cannot produce a valid deterministic definition.
  */
 final class InvalidDefinitionException extends SettingException {}

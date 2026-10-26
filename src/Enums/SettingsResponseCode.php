@@ -6,7 +6,9 @@ namespace Nvl\Settings\Enums;
 
 use Nvl\Support\Contracts\ResponseCode;
 
-/** Stable public response discriminators for Settings.
+/**
+ * Stable public response discriminators for Settings.
+ *
  * @api
  */
 enum SettingsResponseCode: string implements ResponseCode

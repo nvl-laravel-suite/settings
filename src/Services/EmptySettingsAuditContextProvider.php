@@ -6,7 +6,11 @@ namespace Nvl\Settings\Services;
 
 use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 
-/** Default metadata source; management operations remain independent of HTTP state. */
+/**
+ * Default metadata source; management operations remain independent of HTTP state.
+ *
+ * @internal
+ */
 final readonly class EmptySettingsAuditContextProvider implements SettingsAuditContextProvider
 {
     public function metadata(): array

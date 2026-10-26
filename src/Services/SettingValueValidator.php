@@ -12,6 +12,8 @@ use Nvl\Settings\Support\Definition;
 
 /**
  * Enforces definition rules and canonical type encoding for setting values.
+ *
+ * @internal
  */
 final readonly class SettingValueValidator
 {

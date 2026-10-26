@@ -35,8 +35,8 @@ $record = app(SettingReader::class)->get('site.title');
 use Nvl\Settings\Services\SettingWriter;
 
 $writer = app(SettingWriter::class);
-$created = $writer->set('site.title', 'New title', $actor, expectedRevision: 0);
-$reset = $writer->reset('site.title', $actor, expectedRevision: $created['revision']);
+$created = $writer->set('site.title', 'New title', $actor, expected_revision: 0);
+$reset = $writer->reset('site.title', $actor, expected_revision: $created['revision']);
 ```
 
 `$actor` is an explicit Laravel `Authenticatable` or `SystemActor`. Host code binds `SettingsAuthorization`, or sets `nvl-settings.management.authorization_ability` for a Gate checked with the supplied authenticated actor. The default binding denies system actors; background writes need an explicit host authorization binding. A system enum value or nullable principal never grants authority by itself.

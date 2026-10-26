@@ -236,7 +236,6 @@
             "kind": "class",
             "file": "src/Models/Setting.php",
             "methods": [
-                "bootHasOwnership",
                 "delete",
                 "fresh",
                 "fullKey",

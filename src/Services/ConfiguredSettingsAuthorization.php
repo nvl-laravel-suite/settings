@@ -13,6 +13,8 @@ use Nvl\Support\Enums\SystemActor;
 
 /**
  * Gate-backed authorization that fails closed until explicitly configured.
+ *
+ * @internal
  */
 final class ConfiguredSettingsAuthorization implements SettingsAuthorization
 {
