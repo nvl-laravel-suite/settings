@@ -25,13 +25,13 @@ use Nvl\Settings\Services\SettingsAdopter;
 use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
-use Nvl\Settings\Tests\TestCase;
+use Nvl\Settings\Tests\SettingsCacheTestCase;
 use Nvl\Support\Enums\SystemActor;
 
 uses(InteractsWithSettings::class);
 
 it('plans applies and reconciles an explicit legacy key replacement manifest', function (): void {
-    /** @var TestCase $this */
+    /** @var SettingsCacheTestCase $this */
     $this->defineSettings([
         'core.dual_pricing_enabled' => [
             'type' => SettingType::Boolean,
@@ -101,7 +101,7 @@ it('plans applies and reconciles an explicit legacy key replacement manifest', f
 });
 
 it('runs the adoption command as a non-mutating dry run by default', function (): void {
-    /** @var TestCase $this */
+    /** @var SettingsCacheTestCase $this */
     $this->defineSettings([
         'core.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
@@ -149,7 +149,7 @@ it('runs the adoption command as a non-mutating dry run by default', function ()
 });
 
 it('rolls back every staged write when a later target has a stale expected revision', function (): void {
-    /** @var TestCase $this */
+    /** @var SettingsCacheTestCase $this */
     $this->defineSettings([
         'core.first' => ['type' => SettingType::Boolean, 'default' => false],
         'core.second' => ['type' => SettingType::Boolean, 'default' => false],
@@ -173,14 +173,16 @@ it('rolls back every staged write when a later target has a stale expected revis
     ];
 
     expect(fn () => app(SettingsAdopter::class)->execute($manifest, apply: true, actor: settingsTestActor()))
-        ->toThrow(StaleSettingVersionException::class)
+        ->toThrow(function (Exception $exception): void {
+            expect($exception)->toBeInstanceOf(StaleSettingVersionException::class, $exception->getMessage());
+        })
         ->and(Setting::query()->count())->toBe(1)
         ->and(Setting::query()->firstOrFail()->key)->toBe('second')
         ->and(Setting::query()->firstOrFail()->revision)->toBe(1);
 });
 
 it('fails loudly for incomplete maps counts and same-name legacy collisions', function (): void {
-    /** @var TestCase $this */
+    /** @var SettingsCacheTestCase $this */
     $this->defineSettings([
         'core.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
@@ -225,7 +227,7 @@ it('distinguishes a same-name legacy table from the canonical package schema', f
 });
 
 it('captures replaceable actor and request context without setting values', function (): void {
-    /** @var TestCase $this */
+    /** @var SettingsCacheTestCase $this */
     $this->defineSettings([
         'core.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);

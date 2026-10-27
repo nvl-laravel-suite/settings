@@ -28,12 +28,11 @@ function settingsSetForTest(string $key, mixed $value, ?int $expectedRevision = 
 uses(TestCase::class)->in(
     'Feature/TenantBootstrapSafetyTest.php',
     'SettingManagerTest.php',
-    'SettingsAdoptionTest.php',
     'SettingsConsumerContractsTest.php',
     'SettingsManagementApiTest.php',
     'NativeSettingsServiceTest.php',
 );
 
-uses(SettingsCacheTestCase::class)->in('SettingsCacheTest.php');
+uses(SettingsCacheTestCase::class)->in('SettingsCacheTest.php', 'SettingsAdoptionTest.php');
 
 uses(ConfiguredModelsTestCase::class)->in('ConfiguredModels');
