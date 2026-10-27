@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\Gate;
 use Nvl\Settings\Services\SettingWriter;
+use Nvl\Settings\Tests\ConfiguredModelsTestCase;
 use Nvl\Settings\Tests\SettingsCacheTestCase;
 use Nvl\Settings\Tests\TestCase;
 
@@ -34,3 +35,5 @@ uses(TestCase::class)->in(
 );
 
 uses(SettingsCacheTestCase::class)->in('SettingsCacheTest.php');
+
+uses(ConfiguredModelsTestCase::class)->in('ConfiguredModels');

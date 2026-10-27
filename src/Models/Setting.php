@@ -42,7 +42,7 @@ use Nvl\Support\Ownership\Traits\HasOwnership;
  *
  * @api
  */
-final class Setting extends Model implements Ownable
+class Setting extends Model implements Ownable
 {
     /** @use HasFactory<SettingFactory> */
     use HasFactory;

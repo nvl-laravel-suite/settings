@@ -38,7 +38,8 @@
             "kind": "class",
             "file": "database/factories/SettingFactory.php",
             "methods": [
-                "definition"
+                "definition",
+                "modelName"
             ],
             "properties": [],
             "constants": []
@@ -311,6 +312,16 @@
                 "apply",
                 "restore",
                 "run"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Services\\SettingModelRegistry": {
+            "kind": "class",
+            "file": "src/Services/SettingModelRegistry.php",
+            "methods": [
+                "__construct",
+                "settingClass"
             ],
             "properties": [],
             "constants": []

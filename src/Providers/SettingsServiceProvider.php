@@ -22,7 +22,6 @@ use Nvl\Settings\Console\Commands\ValidateCommand;
 use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Contracts\SettingsAuditContextProvider;
 use Nvl\Settings\Contracts\SettingsAuthorization;
-use Nvl\Settings\Models\Setting as SettingModel;
 use Nvl\Settings\Observers\SettingCacheObserver;
 use Nvl\Settings\Ownership\SettingsAdoptionAdapter as OwnershipAdopter;
 use Nvl\Settings\Ownership\SettingsContextParticipant;
@@ -35,6 +34,7 @@ use Nvl\Settings\Services\PlatformSettingsBootstrap;
 use Nvl\Settings\Services\PlatformSettingsReader;
 use Nvl\Settings\Services\PlatformSettingsRuntime;
 use Nvl\Settings\Services\SettingCache;
+use Nvl\Settings\Services\SettingModelRegistry;
 use Nvl\Settings\Services\SettingReader;
 use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Services\SettingWriter;
@@ -66,6 +66,8 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
         PackageDoctorContributor::register($this->app, 'nvl/settings', fn (): array => $this->app->make(SettingsDoctor::class)->inspect());
 
         $this->mergePackageConfiguration(__DIR__.'/../../config/nvl-settings.php', 'settings');
+        $this->app->singleton(SettingModelRegistry::class);
+        $this->app->booting(fn () => $this->app->make(SettingModelRegistry::class)->prepare());
         $this->app->booted(function (): void {
             if ($this->app->bound(OwnershipAdoptionRegistry::class)) {
                 $this->app->make(OwnershipAdoptionRegistry::class)->register('settings', OwnershipAdopter::class);
@@ -99,7 +101,7 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
      */
     public function boot(): void
     {
-        (new OwnershipRegistrar)->register($this->app->make(OwnershipResourceRegistry::class), $this->app->make('config')->get('nvl-ownership.enabled') === true);
+        $this->app->make(OwnershipRegistrar::class)->register($this->app->make(OwnershipResourceRegistry::class), $this->app->make('config')->get('nvl-ownership.enabled') === true);
         $this->app->make(OwnershipContextParticipants::class)->register(SettingsContextParticipant::class);
         $this->app->make(GlobalNames::class)->translations('settings', __DIR__.'/../../lang', $this->app->make('translation.loader'));
         $this->publishes([
@@ -131,7 +133,7 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
             ]);
         }
 
-        SettingModel::observe(SettingCacheObserver::class);
+        $this->app->make(SettingModelRegistry::class)->settingClass()::observe(SettingCacheObserver::class);
 
         $this->registerValidationRules();
 

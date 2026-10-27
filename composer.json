@@ -9,6 +9,7 @@
         "configuration"
     ],
     "require": {
+        "ext-mbstring": "*",
         "ext-filter": "*",
         "ext-json": "*",
         "laravel/framework": "^13.0",

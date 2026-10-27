@@ -3,9 +3,14 @@
 declare(strict_types=1);
 
 use Nvl\Settings\Definitions\Tables\SettingsTables;
+use Nvl\Settings\Models\Setting;
 use Nvl\Support\Config\PackageEnvironment;
 
 return [
+    'models' => [
+        'setting' => Setting::class,
+    ],
+
     'discovery' => [
         'paths' => [base_path('settings')],
         'patterns' => ['*.settings.php', '*.settings.json'],

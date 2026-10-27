@@ -37,7 +37,7 @@ final readonly class SettingCache
     public function records(): Collection
     {
         if (! (bool) config('nvl-settings.cache.enabled', true)
-            || $this->database->connection((new Setting)->getConnectionName())->transactionLevel() > 0) {
+            || $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName())->transactionLevel() > 0) {
             return $this->fetch();
         }
 
@@ -58,7 +58,7 @@ final readonly class SettingCache
         }
 
         return collect($payload)->map(function (array $attributes): Setting {
-            $setting = new Setting;
+            $setting = SettingModelRegistry::newInstance();
             $setting->setRawAttributes($attributes, true);
             $setting->exists = true;
             if ($setting->getRawOriginal('owner_scope_key') !== null) {
@@ -80,7 +80,7 @@ final readonly class SettingCache
     /** Return the immutable identity for the current admitted partition. */
     public function identity(): SettingCacheIdentity
     {
-        $connection = $this->database->connection((new Setting)->getConnectionName());
+        $connection = $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName());
         $hashes = array_map(
             static fn ($definition): string => $definition->hash(),
             $this->definitions->all(),
@@ -129,7 +129,7 @@ final readonly class SettingCache
      */
     public function flushAfterCommit(): void
     {
-        $connection = $this->database->connection((new Setting)->getConnectionName());
+        $connection = $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName());
         $identity = $this->identity();
 
         if ($connection->transactionLevel() === 0) {
@@ -150,7 +150,7 @@ final readonly class SettingCache
      */
     private function fetch(): Collection
     {
-        return $this->boundary->query(Setting::query(), 'settings.values')->get();
+        return $this->boundary->query(SettingModelRegistry::query(), 'settings.values')->get();
     }
 
     /**

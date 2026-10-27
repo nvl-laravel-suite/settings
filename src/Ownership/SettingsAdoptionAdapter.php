@@ -11,7 +11,7 @@ use Nvl\Ownership\Services\OwnershipSchema;
 use Nvl\Ownership\ValueObjects\OwnershipAdoptionPlan;
 use Nvl\Ownership\ValueObjects\OwnershipBackfillResult;
 use Nvl\Ownership\ValueObjects\OwnershipVerification;
-use Nvl\Settings\Models\Setting;
+use Nvl\Settings\Services\SettingModelRegistry;
 use Nvl\Support\Ownership\Exceptions\OwnershipConfigurationInvalid;
 
 /**
@@ -34,7 +34,7 @@ final readonly class SettingsAdoptionAdapter implements OwnershipAdoptionAdapter
     public function prepare(OwnershipAdoptionPlan $plan): void
     {
         $this->schema->prepare('settings.values');
-        $model = new Setting;
+        $model = SettingModelRegistry::newInstance();
         $schema = $model->getConnection()->getSchemaBuilder();
         $columns = ['owner_scope_key', 'namespace', 'scope', 'key'];
         $present = false;
@@ -52,7 +52,7 @@ final readonly class SettingsAdoptionAdapter implements OwnershipAdoptionAdapter
     /** Assign every actual row from an immutable reviewed mapping, never a default. */
     public function backfill(OwnershipAdoptionPlan $plan, ?string $cursor, int $limit): OwnershipBackfillResult
     {
-        $model = new Setting;
+        $model = SettingModelRegistry::newInstance();
         $connection = $model->getConnection();
         $rows = $connection->table($model->getTable())->when($cursor !== null, static fn ($query) => $query->where('id', '>', $cursor))->orderBy('id')->limit($limit)->get();
         $last = null;

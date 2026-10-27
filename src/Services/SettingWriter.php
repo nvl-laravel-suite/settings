@@ -96,7 +96,7 @@ final readonly class SettingWriter
             throw ValidationException::withMessages(['valid_from' => ['Configuration overrides cannot use scheduled validity windows.']]);
         }
 
-        $connection = $this->database->connection((new Setting)->getConnectionName());
+        $connection = $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName());
         $setting = $connection->transaction(function () use (
             $actor, $connection, $definition, $expectedRevision, $key, $options, $providedFrom, $providedUntil, $value,
         ): Setting {
@@ -184,7 +184,7 @@ final readonly class SettingWriter
             throw new InvalidArgumentException('Expected revision must be positive.');
         }
         $definition = $this->definitions->get($key);
-        $connection = $this->database->connection((new Setting)->getConnectionName());
+        $connection = $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName());
         $setting = $connection->transaction(function () use ($actor, $connection, $definition, $expectedRevision, $key): Setting {
             $setting = $this->identityQuery($definition)->lockForUpdate()->firstOrFail();
             if ($setting->revision !== $expectedRevision) {
@@ -265,7 +265,7 @@ final readonly class SettingWriter
         ?string $provider,
         SettingPruneStrategy $prune,
     ): array {
-        $connection = $this->database->connection((new Setting)->getConnectionName());
+        $connection = $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName());
 
         return $connection->transaction(function () use (
             $definitions,
@@ -513,7 +513,7 @@ final readonly class SettingWriter
      */
     private function existingQuery(?string $provider): Builder
     {
-        return $this->boundary->query(Setting::query(), 'settings.values')->when(
+        return $this->boundary->query(SettingModelRegistry::query(), 'settings.values')->when(
             $provider !== null,
             static fn (Builder $query): Builder => $query->where('namespace', $provider),
         );
@@ -526,7 +526,7 @@ final readonly class SettingWriter
      */
     private function identityQuery(Definition $definition): Builder
     {
-        return $this->boundary->query(Setting::query(), 'settings.values')->where([
+        return $this->boundary->query(SettingModelRegistry::query(), 'settings.values')->where([
             'namespace' => $definition->namespace,
             'scope' => $definition->scope,
             'key' => $definition->key,

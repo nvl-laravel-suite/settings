@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Nvl\Settings\Services;
 
 use InvalidArgumentException;
-use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
 
 /**
@@ -126,7 +125,7 @@ final readonly class SettingsAdoptionManifest
             }
         }
 
-        $target = new Setting;
+        $target = SettingModelRegistry::newInstance();
         $targetConnection = $target->getConnectionName() ?? config('database.default');
 
         if ($sourceTable === $target->getTable() && $connection === $targetConnection) {

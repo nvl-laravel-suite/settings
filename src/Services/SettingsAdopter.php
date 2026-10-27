@@ -123,7 +123,7 @@ final readonly class SettingsAdopter
                 || array_diff(array_keys($prepared), array_keys($normalized['expected_revisions'])) !== []) {
                 throw new InvalidArgumentException('Settings adoption apply requires an explicit actor and expected revision for every mapped target.');
             }
-            $target = new Setting;
+            $target = SettingModelRegistry::newInstance();
             $matched = $target->getConnection()->transaction(function () use ($actor, $normalized, $prepared): int {
                 foreach ($prepared as $targetKey => $value) {
                     $this->writer->set($targetKey, $value, $actor, $normalized['expected_revisions'][$targetKey]);
@@ -168,7 +168,7 @@ final readonly class SettingsAdopter
 
         foreach ($prepared as $targetKey => $value) {
             $definition = $this->definitions->get($targetKey);
-            $record = $this->boundary->query(Setting::query(), 'settings.values')->where([
+            $record = $this->boundary->query(SettingModelRegistry::query(), 'settings.values')->where([
                 'namespace' => $definition->namespace,
                 'scope' => $definition->scope,
                 'key' => $definition->key,
@@ -196,7 +196,7 @@ final readonly class SettingsAdopter
      */
     private function assertCanonicalSchema(): void
     {
-        $model = new Setting;
+        $model = SettingModelRegistry::newInstance();
         $schema = Schema::connection($model->getConnectionName());
         $table = $model->getTable();
         $required = [
@@ -232,7 +232,7 @@ final readonly class SettingsAdopter
 
         foreach ($prepared as $targetKey => $value) {
             $definition = $this->definitions->get($targetKey);
-            $record = $this->boundary->query(Setting::query(), 'settings.values')->where([
+            $record = $this->boundary->query(SettingModelRegistry::query(), 'settings.values')->where([
                 'namespace' => $definition->namespace,
                 'scope' => $definition->scope,
                 'key' => $definition->key,

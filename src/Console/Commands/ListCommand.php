@@ -7,6 +7,7 @@ namespace Nvl\Settings\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Nvl\Settings\Models\Setting;
+use Nvl\Settings\Services\SettingModelRegistry;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Stringable;
@@ -36,7 +37,7 @@ final class ListCommand extends Command
             );
         }
 
-        $records = $boundary->query(Setting::query(), 'settings.values')
+        $records = $boundary->query(SettingModelRegistry::query(), 'settings.values')
             ->get()
             ->keyBy(static fn (Setting $setting): string => $setting->fullKey());
 

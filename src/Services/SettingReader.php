@@ -154,7 +154,7 @@ final readonly class SettingReader
             return [];
         }
 
-        return $this->boundary->query(Setting::query(), 'settings.values')
+        return $this->boundary->query(SettingModelRegistry::query(), 'settings.values')
             ->where(function (Builder $query) use ($definitions): void {
                 foreach ($definitions as $definition) {
                     $query->orWhere(static function (Builder $identity) use ($definition): void {
@@ -169,7 +169,7 @@ final readonly class SettingReader
     /** @return Builder<Setting> */
     private function identityQuery(Definition $definition): Builder
     {
-        return $this->boundary->query(Setting::query(), 'settings.values')->where([
+        return $this->boundary->query(SettingModelRegistry::query(), 'settings.values')->where([
             'namespace' => $definition->namespace,
             'scope' => $definition->scope,
             'key' => $definition->key,

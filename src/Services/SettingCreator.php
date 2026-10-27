@@ -22,8 +22,8 @@ final readonly class SettingCreator
     public function insert(array $attributes): int
     {
         try {
-            $this->writer->create(Setting::class, static function (array $ownership) use ($attributes): Setting {
-                $setting = new Setting;
+            $this->writer->create(SettingModelRegistry::modelClass(), static function (array $ownership) use ($attributes): Setting {
+                $setting = SettingModelRegistry::newInstance();
                 $setting->setRawAttributes([...$attributes, ...$ownership]);
                 $setting->save();
 

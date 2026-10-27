@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Nvl\Settings\Enums\SettingType;
-use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\DefinitionRepository;
 use Throwable;
 
@@ -48,7 +47,7 @@ final readonly class SettingsDoctor
      */
     private function schemaChecks(): array
     {
-        $model = new Setting;
+        $model = SettingModelRegistry::newInstance();
         $schema = Schema::connection($model->getConnectionName());
         $table = $model->getTable();
 
@@ -162,7 +161,7 @@ final readonly class SettingsDoctor
         $identityColumns = $owned
             ? ['owner_scope_key', 'namespace', 'scope', 'key']
             : ['namespace', 'scope', 'key'];
-        $duplicatesExist = Setting::query()
+        $duplicatesExist = SettingModelRegistry::query()
             ->select($identityColumns)
             ->groupBy($identityColumns)
             ->havingRaw('COUNT(*) > 1')

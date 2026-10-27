@@ -4,6 +4,10 @@ Source controlled, typed definitions with owner scoped runtime overrides for Lar
 
 Install with `composer require nvl/settings` in a Laravel 13 application.
 
+## Configured models
+
+Configure `nvl-settings.models.setting` before providers boot to replace `Nvl\Settings\Models\Setting` with a concrete subclass. `SettingModelRegistry` freezes that choice and retains the native morph identity, UUID key, required casts, ownership scope and persistence hooks. The native revision hook and resource ownership declaration cannot be overridden. Native writes, reads, primitive cache hydration, observers, factories and queued model restoration use the configured class; definitions and `settings.values` ownership classification remain package controlled. Extra compatible schema columns and host presentation methods are supported; native mutation payloads keep their existing allowlist. Package storage configuration remains available. A subclass may select another source connection or compatible table, but the host must provision that schema; native transactions, rollback, cache invalidation and events follow that root's actual connection.
+
 ## Quickstart
 
 Configure `nvl-settings.discovery.paths`, then register a definition such as `settings/site.settings.php`:

@@ -6,6 +6,7 @@ namespace Nvl\Settings\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Nvl\Settings\Models\Setting;
+use Nvl\Settings\Services\SettingModelRegistry;
 
 /**
  * Builds Setting fixture rows and their declared package parents.
@@ -17,6 +18,14 @@ use Nvl\Settings\Models\Setting;
 final class SettingFactory extends Factory
 {
     protected $model = Setting::class;
+
+    /** Resolve the deployment root for native and inherited factories.
+     * @return class-string<Setting>
+     */
+    public function modelName(): string
+    {
+        return SettingModelRegistry::modelClass();
+    }
 
     /**
      * Prepare native parent and owner facts after Laravel expands relationships.

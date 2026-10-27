@@ -37,7 +37,7 @@ final readonly class PlatformSettingsReader
      */
     public function available(): bool
     {
-        $setting = new Setting;
+        $setting = SettingModelRegistry::newInstance();
         $connection = $setting->getConnection();
         $schema = $connection->getSchemaBuilder();
 
@@ -71,7 +71,7 @@ final readonly class PlatformSettingsReader
     public function records(): Collection
     {
         if (! $this->available()) {
-            return (new Setting)->newCollection();
+            return SettingModelRegistry::newInstance()->newCollection();
         }
 
         $definitions = array_filter(
@@ -80,10 +80,10 @@ final readonly class PlatformSettingsReader
         );
 
         if ($definitions === []) {
-            return (new Setting)->newCollection();
+            return SettingModelRegistry::newInstance()->newCollection();
         }
 
-        $query = Setting::query()->withoutGlobalScope(OwnershipScope::class)->useWritePdo();
+        $query = SettingModelRegistry::query()->withoutGlobalScope(OwnershipScope::class)->useWritePdo();
         if ($this->resources->get('settings.values')->ownership->strategy === 'captured') {
             $query->where('owner_scope_key', 'central')->whereNull('owner_reference');
         }
