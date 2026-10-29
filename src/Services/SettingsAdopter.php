@@ -61,11 +61,13 @@ final readonly class SettingsAdopter
             ->table($table)
             ->select([$normalized['key_column'], $normalized['value_column']])
             ->orderBy($normalized['key_column'])
+            ->limit($normalized['expected_count'] + 1)
             ->get();
 
         if ($rows->count() !== $normalized['expected_count']) {
             throw new InvalidArgumentException(
-                "Settings adoption expected {$normalized['expected_count']} source rows but found {$rows->count()}.",
+                "Settings adoption expected {$normalized['expected_count']} source rows but found "
+                .($rows->count() > $normalized['expected_count'] ? 'at least ' : '').$rows->count().'.',
             );
         }
 

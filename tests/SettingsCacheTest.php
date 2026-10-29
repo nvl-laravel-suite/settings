@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Enums\SettingType;
@@ -19,9 +20,10 @@ it('caches only primitive setting payloads on serialized stores', function (): v
     $this->defineSettings([
         'catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
-    $key = 'nvl:settings:test:'.Str::uuid();
+    $prefix = 'nvl:settings:test:'.Str::uuid();
     config()->set('nvl-settings.cache.store', 'file');
-    config()->set('nvl-settings.cache.key', $key);
+    config()->set('nvl-settings.cache.key', $prefix);
+    $key = app(SettingCache::class)->identity()->key;
     config()->set('cache.serializable_classes', false);
     $repository = app(SettingRepository::class);
 
@@ -46,9 +48,10 @@ it('rebuilds malformed primitive cache payloads before model hydration', functio
     $this->defineSettings([
         'catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
-    $key = 'nvl:settings:test:'.Str::uuid();
+    $prefix = 'nvl:settings:test:'.Str::uuid();
     config()->set('nvl-settings.cache.store', 'array');
-    config()->set('nvl-settings.cache.key', $key);
+    config()->set('nvl-settings.cache.key', $prefix);
+    $key = app(SettingCache::class)->identity()->key;
     $repository = app(SettingRepository::class);
     settingsSetForTest('catalog.enabled', true);
     $repository->get('catalog.enabled');
@@ -82,7 +85,7 @@ it('invalidates cached settings only after the outer transaction commits', funct
     $repository = app(SettingRepository::class);
     settingsSetForTest('catalog.enabled', true);
     expect($repository->get('catalog.enabled'))->toBeTrue();
-    $key = config('nvl-settings.cache.key');
+    $key = app(SettingCache::class)->identity()->key;
     $connection = DB::connection((new Setting)->getConnectionName());
 
     $connection->beginTransaction();
@@ -113,7 +116,7 @@ it('does not publish uncommitted settings into an empty shared cache', function 
         'catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false],
     ]);
     $repository = app(SettingRepository::class);
-    $key = config('nvl-settings.cache.key');
+    $key = app(SettingCache::class)->identity()->key;
     $connection = DB::connection((new Setting)->getConnectionName());
     $connection->beginTransaction();
 
@@ -127,4 +130,26 @@ it('does not publish uncommitted settings into an empty shared cache', function 
 
     expect(Setting::query()->count())->toBe(0)
         ->and($repository->get('catalog.enabled'))->toBeFalse();
+});
+
+it('does not share unowned cached values between configured storage tables', function (): void {
+    $this->defineSettings(['catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false]]);
+    $table = (new Setting)->getTable();
+    settingsSetForTest('catalog.enabled', true);
+    config()->set('nvl-settings.tables.settings', 'alternate_settings');
+    $migration = require dirname(__DIR__).'/database/migrations/2026_01_01_000000_nvl_settings_create_settings_table.php';
+    $migration->up();
+
+    try {
+        settingsSetForTest('catalog.enabled', false);
+        config()->set('nvl-settings.tables.settings', $table);
+        app(SettingCache::class)->flush();
+        $repository = app(SettingRepository::class);
+        expect($repository->get('catalog.enabled'))->toBeTrue();
+        config()->set('nvl-settings.tables.settings', 'alternate_settings');
+        expect($repository->get('catalog.enabled'))->toBeFalse();
+    } finally {
+        Schema::dropIfExists('alternate_settings');
+        config()->set('nvl-settings.tables.settings', $table);
+    }
 });

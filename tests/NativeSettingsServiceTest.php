@@ -5,9 +5,11 @@ declare(strict_types=1);
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\GenericUser;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Nvl\Settings\Enums\SettingAbility;
 use Nvl\Settings\Enums\SettingPruneStrategy;
@@ -19,9 +21,38 @@ use Nvl\Settings\Services\SettingReader;
 use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
+use Nvl\Settings\Tests\Fixtures\OwnershipActor;
 use Nvl\Support\Enums\SystemActor;
 
 uses(InteractsWithSettings::class);
+
+it('authorizes Eloquent actors using canonical persisted attributes', function (string $identity, string $operation): void {
+    $this->defineSettings(['catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false]]);
+    settingsSetForTest('catalog.enabled', false);
+    Schema::create('settings_test_actors', function (Blueprint $table): void {
+        $table->id();
+        $table->boolean('may_manage');
+    });
+    $actor = OwnershipActor::query()->create(['may_manage' => $identity !== 'modified']);
+    if ($identity === 'deleted') {
+        OwnershipActor::query()->whereKey($actor->getKey())->delete();
+    } elseif ($identity === 'revoked') {
+        OwnershipActor::query()->whereKey($actor->getKey())->update(['may_manage' => false]);
+    } elseif ($identity === 'table') {
+        $actor->setTable('substituted_actors');
+    } else {
+        $actor->setAttribute('may_manage', true);
+    }
+    Gate::define('manage-settings', static fn (OwnershipActor $principal): bool => (bool) $principal->getAttribute('may_manage'));
+    Event::fake([SettingChanged::class]);
+    $writer = app(SettingWriter::class);
+    expect(fn () => $operation === 'set'
+        ? $writer->set('catalog.enabled', true, $actor, 1)
+        : $writer->reset('catalog.enabled', $actor, 1))->toThrow(AuthorizationException::class);
+    expect(Setting::query()->sole()->revision)->toBe(1)
+        ->and(Setting::query()->sole()->value)->toBeFalse();
+    Event::assertNotDispatched(SettingChanged::class);
+})->with(['modified', 'deleted', 'revoked', 'table'])->with(['set', 'reset']);
 
 it('requires explicit actor policy and revision for an existing override', function (): void {
     $this->defineSettings(['catalog.value' => ['type' => SettingType::Integer, 'default' => 3]]);

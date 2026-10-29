@@ -77,7 +77,7 @@ final readonly class SettingWriter
         ?int $expectedRevision = null,
         array $options = [],
     ): array {
-        $this->assertActor($actor);
+        $actor = $this->resolveActor($actor);
         $this->authorization->authorize($actor, SettingAbility::Set, $key);
         if (array_diff(array_keys($options), ['valid_from', 'valid_until']) !== []) {
             throw new InvalidArgumentException('Unknown setting mutation option.');
@@ -178,7 +178,7 @@ final readonly class SettingWriter
      */
     public function reset(string $key, Authenticatable|SystemActor $actor, int $expectedRevision): array
     {
-        $this->assertActor($actor);
+        $actor = $this->resolveActor($actor);
         $this->authorization->authorize($actor, SettingAbility::Reset, $key);
         if ($expectedRevision < 1) {
             throw new InvalidArgumentException('Expected revision must be positive.');
@@ -448,16 +448,34 @@ final readonly class SettingWriter
         }
     }
 
-    private function assertActor(Authenticatable|SystemActor $actor): void
+    private function resolveActor(Authenticatable|SystemActor $actor): Authenticatable|SystemActor
     {
         if ($actor instanceof SystemActor) {
-            return;
+            return $actor;
         }
         $id = $actor->getAuthIdentifier();
         if ((! is_string($id) && ! is_int($id)) || $id === ''
             || ($actor instanceof Model && (! $actor->exists || $actor->isDirty($actor->getAuthIdentifierName())))) {
             throw new AuthorizationException('Settings mutations require a persisted actor.');
         }
+
+        if (! $actor instanceof Model) {
+            return $actor;
+        }
+        $canonical = new ($actor::class);
+        $defaultConnection = $this->database->getDefaultConnection();
+        if ($canonical->getTable() !== $actor->getTable()
+            || $canonical->getKeyName() !== $actor->getKeyName()
+            || ($canonical->getConnectionName() ?? $defaultConnection) !== ($actor->getConnectionName() ?? $defaultConnection)
+            || $actor->getRawOriginal($actor->getKeyName()) !== $actor->getKey()) {
+            throw new AuthorizationException('Settings actor storage cannot be substituted.');
+        }
+        $persisted = $canonical->newQuery()->whereKey($actor->getKey())->first();
+        if (! $persisted instanceof Authenticatable || $persisted->getAuthIdentifier() !== $id) {
+            throw new AuthorizationException('Settings mutations require a persisted actor.');
+        }
+
+        return $persisted;
     }
 
     private function assertOverrideAllowed(Definition $definition): void

@@ -39,11 +39,13 @@ $record = app(SettingReader::class)->get('site.title');
 use Nvl\Settings\Services\SettingWriter;
 
 $writer = app(SettingWriter::class);
-$created = $writer->set('site.title', 'New title', $actor, expected_revision: 0);
-$reset = $writer->reset('site.title', $actor, expected_revision: $created['revision']);
+$created = $writer->set('site.title', 'New title', $actor, expectedRevision: 0);
+$reset = $writer->reset('site.title', $actor, expectedRevision: $created['revision']);
 ```
 
 `$actor` is an explicit Laravel `Authenticatable` or `SystemActor`. Host code binds `SettingsAuthorization`, or sets `nvl-settings.management.authorization_ability` for a Gate checked with the supplied authenticated actor. The default binding denies system actors; background writes need an explicit host authorization binding. A system enum value or nullable principal never grants authority by itself.
+
+Eloquent actors are reloaded from their canonical storage before authorization. Modified in-memory permissions, deleted principals and substituted actor storage cannot grant access. Custom non-Eloquent principals remain the host policy's responsibility.
 
 Existing rows require their exact revision for `set` and `reset`; `null` cannot bypass compare and swap. Revision `0` is the create expectation. Equivalent writes and resets of uncustomized rows produce no event. Setting `valid_from` or `valid_until` to `null` clears that bound, while omitting a bound preserves it. Validity instants are stored as UTC seconds, including when input has an offset; an equivalent instant is a no-op. Windows are unavailable for config mapped definitions. The writer validates values, performs the scoped transaction and schedules cache invalidation and value free events after the actual outer commit. A rolled back transaction publishes neither.
 
@@ -57,9 +59,11 @@ Config overrides are opt in with `nvl-settings.overrides.enabled`. Definitions w
 
 ## Database caching and adoption
 
-`SettingCache` caches scoped rows under the configured versioned key and store. A transaction on the Settings connection reads its own writes without shared cache. Cache invalidation occurs after the real outer commit. `nvl:settings:cache` rebuilds discovery, while `nvl:settings:clear` clears its cache.
+`SettingCache` uses the configured key as a prefix, isolating entries by model, database source, table, ownership and definition hashes in both owned and unowned installations. A transaction on the Settings connection reads its own writes without shared cache. Cache invalidation occurs after the real outer commit. `nvl:settings:cache` rebuilds discovery, while `nvl:settings:clear` clears its cache.
 
 `nvl:settings:adopt <manifest>` plans an import from a staged legacy table; `--apply` requires a host `SettingsAuthorization` binding for `SystemActor::Background`. A version 1 manifest names `source_table`, `expected_count`, explicit `key_replacements`, and `expected_revisions` for every mapped target. Use revision `0` for absent targets and the exact current revision for existing rows. Apply uses `SettingWriter::set` for each target inside one target connection transaction, then reconciles all targets before commit. A stale revision or mismatch rolls back the whole import. The plan returns counts, never setting values. This is a staged import workflow, not automatic legacy schema conversion.
+
+Source reads stop after the declared count plus one sentinel row, rejecting oversized staging tables without loading all their values into application memory.
 
 ## Setting change subject reference
 

@@ -80,7 +80,7 @@ final readonly class SettingCache
     /** Return the immutable identity for the current admitted partition. */
     public function identity(): SettingCacheIdentity
     {
-        $connection = $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName());
+        $model = SettingModelRegistry::newInstance();
         $hashes = array_map(
             static fn ($definition): string => $definition->hash(),
             $this->definitions->all(),
@@ -92,7 +92,7 @@ final readonly class SettingCache
             ? $this->boundary->key('settings.values', 'records')
             : 'disabled';
 
-        return $this->makeIdentity($connection->getName() ?? 'default', $ownership, $hashes);
+        return $this->makeIdentity($model, $ownership, $hashes);
     }
 
     /** Derive a stable identity directly from a persisted row. */
@@ -112,7 +112,7 @@ final readonly class SettingCache
         }
 
         return $this->makeIdentity(
-            $setting->getConnection()->getName() ?? 'default',
+            $setting,
             $scope !== null ? $this->boundary->key('settings.values', 'records') : 'disabled',
             $hashes,
         );
@@ -275,15 +275,26 @@ final readonly class SettingCache
      *
      * @param  list<string>  $definitionHashes
      */
-    private function makeIdentity(string $connection, string $ownership, array $definitionHashes): SettingCacheIdentity
+    private function makeIdentity(Setting $setting, string $ownership, array $definitionHashes): SettingCacheIdentity
     {
-        if ($ownership === 'disabled') {
-            return new SettingCacheIdentity($this->store(), $this->key());
-        }
+        $connection = $setting->getConnection();
 
         return new SettingCacheIdentity($this->store(), implode(':', [
             $this->key(),
-            hash('sha256', implode('|', [$connection, $ownership, ...$definitionHashes])),
+            hash('sha256', json_encode([
+                $setting::class,
+                $connection->getName(),
+                $connection->getDriverName(),
+                $connection->getConfig('host'),
+                $connection->getConfig('port'),
+                $connection->getConfig('username'),
+                $connection->getDatabaseName(),
+                $connection->getConfig('search_path'),
+                $connection->getConfig('schema'),
+                $connection->getTablePrefix().$setting->getTable(),
+                $ownership,
+                $definitionHashes,
+            ], JSON_THROW_ON_ERROR)),
         ]));
     }
 }

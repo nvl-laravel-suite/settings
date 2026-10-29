@@ -30,6 +30,34 @@ use Nvl\Support\Enums\SystemActor;
 
 uses(InteractsWithSettings::class);
 
+it('bounds source reads when a staged import exceeds its declared row count', function (): void {
+    $this->defineSettings(['core.enabled' => ['type' => SettingType::Boolean, 'default' => false]]);
+    Schema::create('oversized_settings', function (Blueprint $table): void {
+        $table->string('key')->primary();
+        $table->text('value');
+    });
+    DB::table('oversized_settings')->insert([
+        ['key' => 'first', 'value' => '1'],
+        ['key' => 'second', 'value' => '1'],
+        ['key' => 'third', 'value' => '1'],
+    ]);
+    DB::enableQueryLog();
+    try {
+        expect(fn () => app(SettingsAdopter::class)->execute([
+            'version' => 1,
+            'source_table' => 'oversized_settings',
+            'expected_count' => 1,
+            'key_replacements' => ['first' => 'core.enabled'],
+        ]))->toThrow(InvalidArgumentException::class);
+        $query = collect(DB::getQueryLog())->first(fn (array $entry): bool => str_contains($entry['query'], 'from "oversized_settings"'));
+        expect($query['query'])->toContain('limit 2')
+            ->and(Setting::query()->count())->toBe(0);
+    } finally {
+        DB::disableQueryLog();
+        DB::flushQueryLog();
+    }
+});
+
 it('plans applies and reconciles an explicit legacy key replacement manifest', function (): void {
     /** @var SettingsCacheTestCase $this */
     $this->defineSettings([
