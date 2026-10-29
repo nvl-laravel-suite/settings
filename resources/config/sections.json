@@ -5,6 +5,7 @@
             "common": [
                 "cache.enabled",
                 "cache.store",
+                "connection",
                 "discovery.cache",
                 "discovery.cache_path",
                 "discovery.follow_links",
@@ -15,8 +16,7 @@
                 "migrations.enabled",
                 "models.setting",
                 "overrides.enabled",
-                "storage.connection",
-                "storage.table"
+                "tables.settings"
             ],
             "advanced": [
                 "adoption.maximum_manifest_bytes",

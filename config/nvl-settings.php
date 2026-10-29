@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Nvl\Settings\Definitions\Tables\SettingsTables;
 use Nvl\Settings\Models\Setting;
-use Nvl\Support\Config\PackageEnvironment;
 
 /** Complete runtime defaults; publication sections are declared in ../resources/config/sections.json. */
 return [
@@ -25,17 +24,12 @@ return [
         'maximum_files' => 1_000,
         'maximum_file_bytes' => 262_144,
         'maximum_json_depth' => 64,
-        'cache' => PackageEnvironment::get('NVL_SETTINGS_DISCOVERY_CACHE', true),
+        'cache' => env('NVL_SETTINGS_DISCOVERY_CACHE', true),
         'cache_path' => null,
     ],
 
     'sync' => [
         'prune' => 'orphan', // orphan | delete | ignore
-    ],
-
-    'storage' => [
-        'connection' => null,
-        'table' => SettingsTables::Settings,
     ],
 
     'migrations' => [
@@ -52,16 +46,18 @@ return [
     ],
 
     'cache' => [
-        'enabled' => PackageEnvironment::get('NVL_SETTINGS_CACHE', true),
+        'enabled' => env('NVL_SETTINGS_CACHE', true),
         'store' => null,
         'key' => 'nvl:settings:v2',
     ],
 
     'overrides' => [
-        'enabled' => PackageEnvironment::get('NVL_SETTINGS_CONFIG_OVERRIDES', false),
+        'enabled' => env('NVL_SETTINGS_CONFIG_OVERRIDES', false),
         'denied' => [
             'app.key', 'app.debug', 'app.env', 'app.timezone',
             'database.*', 'cache.*', 'nvl-settings.*',
         ],
     ],
+    'connection' => null,
+    'tables' => ['settings' => SettingsTables::Settings],
 ];

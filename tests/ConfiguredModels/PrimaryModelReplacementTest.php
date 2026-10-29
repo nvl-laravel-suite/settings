@@ -41,7 +41,7 @@ class SettingsMissingCast extends ExtendedSetting
 }
 
 it('uses the configured setting in native writes cached reads factories restoration and revision hooks', function (): void {
-    config()->set('nvl-settings.storage.connection', null);
+    config()->set('nvl-settings.connection', null);
     app(DefinitionRepository::class)->fake(['catalog.label' => ['type' => SettingType::Text, 'default' => 'Original']]);
     $writer = app(SettingWriter::class);
     $created = $writer->set('catalog.label', 'Custom', settingsTestActor(), 0);
@@ -78,7 +78,7 @@ it('uses the configured setting in native writes cached reads factories restorat
 });
 
 it('keeps configured source rollback out of persisted values cache and events', function (): void {
-    config()->set('nvl-settings.storage.connection', null);
+    config()->set('nvl-settings.connection', null);
     app(DefinitionRepository::class)->fake(['catalog.label' => ['type' => SettingType::Text, 'default' => 'Original']]);
     $writer = app(SettingWriter::class);
     $writer->set('catalog.label', 'Committed', settingsTestActor(), 0);

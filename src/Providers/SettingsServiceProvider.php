@@ -88,7 +88,6 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
         $exists = fn (string $name): bool => $this->app->bound($name);
         $install = fn (string $name) => $this->app->alias(SettingRepository::class, $name);
         $names->reserve('settings', 'container', 'nvl.settings', $exists, $install);
-        $names->register('settings', 'container', 'settings', 'nvl.settings', $exists, $install);
         $this->app->bindIf(SettingsAuthorization::class, ConfiguredSettingsAuthorization::class);
         $this->app->bindIf(
             SettingsAuditContextProvider::class,
@@ -109,17 +108,17 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
         ], 'nvl-settings-translations');
         $this->publishes([
             __DIR__.'/../../config/nvl-settings.php' => config_path('nvl-settings.php'),
-        ], 'settings-config');
+        ], 'nvl-settings-config');
 
         $this->publishesMigrations([
             __DIR__.'/../../database/migrations' => database_path('migrations'),
-        ], 'settings-migrations');
+        ], 'nvl-settings-migrations');
         if ((bool) config('nvl-settings.migrations.enabled', true)) {
             $this->loadMigrationsFrom(__DIR__.'/../../database/migrations');
         }
         $this->publishes([
             __DIR__.'/../../resources/boost/skills' => base_path('.agents/skills'),
-        ], 'settings-skills');
+        ], 'nvl-settings-skills');
 
         if ($this->app->runningInConsole()) {
             $this->commands([

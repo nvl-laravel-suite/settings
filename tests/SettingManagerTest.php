@@ -32,15 +32,15 @@ uses(InteractsWithSettings::class);
 
 it('preserves nested settings defaults around consumer overrides', function (): void {
     config()->set('nvl-settings', [
-        'storage' => [
-            'table' => 'consumer_settings',
+        'tables' => [
+            'settings' => 'consumer_settings',
         ],
     ]);
 
     (new SettingsServiceProvider(app()))->register();
 
-    expect(config('nvl-settings.storage.table'))->toBe('consumer_settings')
-        ->and(config('nvl-settings.storage.connection'))->toBeNull()
+    expect(config('nvl-settings.tables.settings'))->toBe('consumer_settings')
+        ->and(config('nvl-settings.connection'))->toBeNull()
         ->and(config('nvl-settings.cache.key'))->toBe('nvl:settings:v2')
         ->and(config('nvl-settings.management.authorization_ability'))->toBeNull();
 });
@@ -848,7 +848,7 @@ it('rejects setting identity segments that exceed storage limits', function (): 
 });
 
 it('requires exact index uniqueness when diagnosing a consumer table', function (): void {
-    config()->set('nvl-settings.storage.table', 'consumer_settings');
+    config()->set('nvl-settings.tables.settings', 'consumer_settings');
     $migration = require __DIR__.'/../database/migrations/2026_01_01_000000_nvl_settings_create_settings_table.php';
     $migration->up();
 
@@ -917,7 +917,7 @@ it('continues identifier diagnostics after encountering an invalid value codec',
 });
 
 it('validates configured-table indexes by columns instead of hardcoded names', function (): void {
-    config()->set('nvl-settings.storage.table', 'consumer_settings');
+    config()->set('nvl-settings.tables.settings', 'consumer_settings');
     $migration = require __DIR__.'/../database/migrations/2026_01_01_000000_nvl_settings_create_settings_table.php';
     $migration->up();
 

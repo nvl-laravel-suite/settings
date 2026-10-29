@@ -72,3 +72,5 @@ Bind `SettingsAuthorization` in host tests, register definitions via `Definition
 ## License
 
 MIT.
+
+Shared [service contracts, model extensions and composition](https://github.com/nvl-laravel-suite/laravel-suite/blob/main/docs/consumer-api.md) apply alongside the package-specific rules above.

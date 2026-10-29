@@ -252,12 +252,12 @@ it('validates discovery cache and management adoption failures', function (): vo
 
         config()->set([
             'nvl-settings.discovery.cache' => false,
-            'nvl-settings.storage.table' => 'missing_consumer_settings',
+            'nvl-settings.tables.settings' => 'missing_consumer_settings',
         ]);
         $checks = collect(app(SettingsDoctor::class)->inspect())->keyBy('key');
         expect($checks['schema.table']['passed'])->toBeFalse();
 
-        config()->set('nvl-settings.storage.table', 'incomplete_consumer_settings');
+        config()->set('nvl-settings.tables.settings', 'incomplete_consumer_settings');
         Schema::create('incomplete_consumer_settings', function ($table): void {
             $table->uuid('id')->primary();
         });
