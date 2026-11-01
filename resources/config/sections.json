@@ -22,6 +22,7 @@
                 "adoption.maximum_manifest_bytes",
                 "adoption.maximum_records",
                 "cache.key",
+                "cache.ttl",
                 "discovery.maximum_file_bytes",
                 "discovery.maximum_files",
                 "discovery.maximum_json_depth",

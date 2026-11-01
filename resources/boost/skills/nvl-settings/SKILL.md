@@ -1,33 +1,74 @@
 ---
 name: nvl-settings
-description: Implement or integrate nvl/settings Light source definitions, native reader and writer services, revisions, ownership, cache, platform overrides, events and staged imports in Laravel 13.
+description: Use when integrating typed source-defined settings, scoped runtime reads, revision-checked management writes, platform config overrides or staged settings adoption in Laravel.
 ---
 
-# NVL Settings Light
+# NVL Settings
 
-Use source controlled `*.settings.php` or `*.settings.json` definitions. Configure bounded discovery roots. Settings holds typed application configuration; keep secrets, personal preferences, UI state and arbitrary model metadata in their owning systems.
+Settings combines source-controlled definitions with typed database overrides.
+Use it for application configuration; keep secrets, arbitrary metadata and UI preferences in their owning systems.
+The application owns HTTP, request mapping, management policy and presentation.
 
-## Configured models
+## References
 
-Configure `nvl-settings.models.setting` before providers boot to replace `Nvl\Settings\Models\Setting` with a concrete subclass. `SettingModelRegistry` freezes that choice and retains the native morph identity, UUID key, required casts, ownership scope and persistence hooks. The native revision hook and resource ownership declaration cannot be overridden. Native writes, reads, primitive cache hydration, observers, factories and queued model restoration use the configured class; definitions and `settings.values` ownership classification remain package controlled. Extra compatible schema columns and host presentation methods are supported; native mutation payloads keep their existing allowlist. Package storage configuration remains available. A subclass may select another source connection or compatible table, but the host must provision that schema; native transactions, rollback, cache invalidation and events follow that root's actual connection.
+- [Installation](references/installation.md): discovery, configuration, migration ownership and publication tags.
+- [API](references/api.md): services, definition/result shapes, policies and model contracts.
+- [Usage](references/usage.md): definitions, reads/writes, validity windows, overrides and adoption.
 
-## Services
+Read the relevant usage recipe and API shape before adding a setting or call.
 
-- Inject `SettingReader` for `get`, `getMany` (at most 500 keys) and `paginate` (allowlisted filters). Results include effective value, source and revision metadata. Persisted rows report the persisted codec type with their value and hash until successful definition sync. `SettingRepository` and the `Setting` facade are read only runtime `get`/`has` access.
-- Inject `SettingWriter` for `set` and `reset`. Supply an actual `Authenticatable` or `SystemActor`, plus the exact expected revision for existing rows. Use `0` for a first write. `null` cannot bypass an existing row's revision.
-- Bind `SettingsAuthorization` in the host or configure the Gate ability for human actors. The default checks the supplied actor through `Gate::forUser` and denies system actors. A background actor needs an explicit host policy binding.
-- Pass `valid_from`/`valid_until` only when changing a window. Omission preserves a bound; explicit `null` clears it. Validity offsets are normalized to UTC seconds before storage, and equivalent instants are no-op writes. Config mapped definitions cannot have scheduled windows.
-- Let `SettingWriter::sync` reconcile definitions and preserve live overrides. It is infrastructure reconciliation, not an unversioned management writer.
-- Treat canonically equivalent writes and absent resets as no ops. Events and cache invalidation occur after the actual outer source connection commit; a rollback discards both.
+## Choose the capability
 
-## Ownership and platform overrides
+| Need | Capability |
+| --- | --- |
+| Runtime scalar lookup | `SettingRepository::get`/`has` or read-only `Setting` facade |
+| Effective value plus revision/source | `SettingReader::get`/`getMany` |
+| Bounded management page | `SettingReader::paginate` |
+| Authorized value mutation | `SettingWriter::set`/`reset` |
+| Definition reconciliation | `SettingWriter::sync` and native commands |
+| Temporary central config projection | `PlatformSettingsRuntime::run` |
+| Reviewed staged legacy import | `nvl:settings:adopt` |
 
-Native Ownership is optional. In an enabled installation, admit the intended owner or central scope explicitly; unresolved context never grants value access. The retired Tenancy bridge cannot supply authority. Keep config mapped values central and opt in to `nvl-settings.overrides.enabled`. Use `PlatformSettingsRuntime::run` around request work and rely on provider job hooks for job work; both restore the preceding config. Restart workers after changing mapped values.
+## Definition and mutation contract
 
-## Consumers and operations
+Discover trusted `*.settings.php` or `*.settings.json` files from configured bounded roots.
+Filename namespace and explicit namespace must agree.
+Definitions declare exact type, default, rules and permitted override behavior.
+Do not forward arbitrary request keys into definition metadata or writer options.
+`set` accepts only `valid_from` and `valid_until` options.
+Omission preserves an existing bound; explicit null clears it.
+Existing rows require their exact revision; use zero to assert first creation.
+`reset` requires an existing row and its positive revision.
+Null is a value only if the definition's type/rules permit it; it is not an unversioned reset.
+Equivalent writes and already-reset rows are no-ops.
 
-Consumers own DTOs, Actions, controllers, routes, middleware and HTTP responses. Settings does not register an HTTP surface. Package events contain scalar identity, key, revision, operation, an explicit principal derived audit context and native ownership capture. The default audit metadata provider does not inspect Request/Auth; hosts may bind a bounded request metadata provider.
+## Authority and model choice
 
-Run `nvl:settings:validate`, `nvl:settings:sync --dry-run`, `nvl:settings:sync` and `nvl:settings:doctor --strict --format=json`. `SettingsDoctor::inspect()` returns bounded diagnostic arrays with `key`, `severity`, `passed` and `message`. For staged imports, a version 1 manifest lists explicit key replacements and `expected_revisions` for every target; `--apply` requires a host binding authorizing `SystemActor::Background`. Import writes and reconciliation share one target transaction and roll back together.
+Pass an explicit `Authenticatable` or deliberately authorized `SystemActor` to management writes.
+Bind `SettingsAuthorization`, or configure the human Gate ability; default system access is denied.
+Eloquent actors are canonically reloaded; host policies own other provider freshness contracts.
+Reader/repository runtime access follows admitted ownership, not a management actor parameter.
+With optional native Ownership enabled, enter the intended owner/central scope and adopt registered storage.
+Unresolved owner state grants no access; an old tenant column or Tenancy bridge cannot grant authority.
+Set `nvl-settings.models.setting` before provider boot for a compatible concrete `Setting` subclass.
+Retain native UUID, casts, morph identity, revision hooks and ownership declaration.
 
-Test native service behavior with real schema, exact revisions, cache, outer rollback, ownership admission, config restoration, and consumer HTTP mapping. See the package [README](../../../../README.md), [upgrade guide](../../../../UPGRADING.md), and [event schema](../../../../docs/events.md).
+## Transactions and operations
+
+The writer owns locking/CAS and the configured model's actual connection transaction.
+Cache invalidation and value-free events follow the real outer commit; rollback discards them.
+`sync` reconciles definitions while retaining live overrides; it is not a management-write bypass.
+Config mappings are central only, opt-in and denylisted; they cannot use validity windows.
+`PlatformSettingsRuntime::run` restores preceding config even when the operation fails.
+Worker hooks manage the corresponding job lifecycle; restart long-running workers after mapped-value changes.
+Keep model storage/schema provisioning and transport resources in the host.
+
+## Verify and maintain
+
+`getMany` accepts at most 500 keys; management page size is at most 100.
+Run `nvl:settings:validate`, `nvl:settings:sync --dry-run`, then reviewed synchronization.
+Use `nvl:settings:doctor --strict --format=json` for bounded diagnostics.
+Adoption plans are count/revision constrained; applying requires an explicit authorized background actor.
+Test types, null/omission, stale revisions, selected connections, owner admission and outer rollback.
+Test config restoration and actual cache isolation, not only controller validation.
+Keep optional Ownership absence bootable; no Data/TypeScript runtime or package routes are required.

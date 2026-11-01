@@ -5,6 +5,10 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- Align NVL peers and consumer contracts on the coordinated 7.x line. Review [UPGRADING.md](UPGRADING.md) for adoption and application-owned integration requirements.
+
 ## [6.0.0] - 2026-10-20
 
 ### Changed

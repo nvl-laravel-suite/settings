@@ -49,6 +49,7 @@ return [
         'enabled' => env('NVL_SETTINGS_CACHE', true),
         'store' => null,
         'key' => 'nvl:settings:v2',
+        'ttl' => 300,
     ],
 
     'overrides' => [

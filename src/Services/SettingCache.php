@@ -7,26 +7,34 @@ namespace Nvl\Settings\Services;
 use Illuminate\Contracts\Cache\Factory;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Nvl\Settings\Models\Setting;
+use Nvl\Settings\Support\Definition;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Support\Ownership\Contracts\OwnershipBoundary;
 use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
+use UnexpectedValueException;
 
 /**
  * Caches setting records as primitive attributes and invalidates them after commits.
  *
  * @internal
  */
-final readonly class SettingCache
+final class SettingCache
 {
+    /** @var array<string, Definition>|null */
+    private ?array $definitionSet = null;
+
+    private string $definitionFingerprint = '';
+
     /**
      * Create the settings record cache.
      */
     public function __construct(
-        private Factory $cache,
-        private DatabaseManager $database,
-        private DefinitionRepository $definitions,
-        private OwnershipBoundary $boundary,
+        private readonly Factory $cache,
+        private readonly DatabaseManager $database,
+        private readonly DefinitionRepository $definitions,
+        private readonly OwnershipBoundary $boundary,
     ) {}
 
     /**
@@ -36,37 +44,108 @@ final readonly class SettingCache
      */
     public function records(): Collection
     {
-        if (! (bool) config('nvl-settings.cache.enabled', true)
-            || $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName())->transactionLevel() > 0) {
+        if (! $this->usesCache()) {
             return $this->fetch();
         }
 
+        return collect($this->payload($this->entryIdentity()))->map($this->hydrate(...))->values();
+    }
+
+    /** Return one record without hydrating the rest of the cached catalog. */
+    public function record(string $key): ?Setting
+    {
+        $definition = $this->definitions->get($key);
+        if (! $this->usesCache()) {
+            return $this->boundary->query(SettingModelRegistry::query(), 'settings.values')
+                ->where('namespace', $definition->namespace)
+                ->where('scope', $definition->scope)
+                ->where('key', $definition->key)
+                ->first();
+        }
+
+        $payload = $this->payload($this->recordIdentity($key), $definition);
+
+        return isset($payload[0]) ? $this->hydrate($payload[0]) : null;
+    }
+
+    /** Return the generation-qualified cache identity for one defined setting. */
+    public function recordIdentity(string $key): SettingCacheIdentity
+    {
+        $this->definitions->get($key);
+
+        return $this->entryIdentity($key);
+    }
+
+    /** Capture one atomic cache generation before any database fill begins. */
+    private function entryIdentity(?string $key = null): SettingCacheIdentity
+    {
         $identity = $this->identity();
+        $store = $this->cache->store($identity->store);
+        $generationKey = $identity->key.':generation';
+        $generation = $store->get($generationKey);
+        if (! is_string($generation) || $generation === '') {
+            $store->add($generationKey, (string) Str::uuid(), $this->ttl());
+            $generation = $store->get($generationKey);
+        }
+        if (! is_string($generation) || $generation === '') {
+            $generation = (string) Str::uuid();
+        }
+
+        return new SettingCacheIdentity($identity->store, $identity->key.':'.$generation.':'.($key === null ? 'records' : hash('sha256', $key)));
+    }
+
+    /** Return a finite cache lifetime, including for obsolete generations. */
+    private function ttl(): int
+    {
+        $ttl = config('nvl-settings.cache.ttl', 300);
+
+        return is_int($ttl) && $ttl > 0 ? $ttl : 300;
+    }
+
+    /** Use shared committed records only outside a transaction on this source. */
+    private function usesCache(): bool
+    {
+        return (bool) config('nvl-settings.cache.enabled', true)
+            && $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName())->transactionLevel() === 0;
+    }
+
+    /** @return list<array<string, bool|float|int|string|null>> */
+    private function payload(SettingCacheIdentity $identity, ?Definition $definition = null): array
+    {
         $store = $this->cache->store($identity->store);
         $key = $identity->key;
         $payload = $store->get($key);
 
-        if (! $this->isValidPayload($payload)) {
+        if (! $this->isValidPayload($payload) || ($definition !== null && ! $this->matchesDefinition($payload, $definition))) {
             if ($payload !== null) {
                 $store->forget($key);
             }
 
-            $payload = $store->rememberForever(
+            $payload = $store->remember(
                 $key,
-                fn (): array => $this->fetchPayload(),
+                $this->ttl(),
+                fn (): array => $this->fetchPayload($definition),
             );
         }
 
-        return collect($payload)->map(function (array $attributes): Setting {
-            $setting = SettingModelRegistry::newInstance();
-            $setting->setRawAttributes($attributes, true);
-            $setting->exists = true;
-            if ($setting->getRawOriginal('owner_scope_key') !== null) {
-                $this->boundary->assertRecord($setting, 'settings.values');
-            }
+        if (! $this->isValidPayload($payload) || ($definition !== null && ! $this->matchesDefinition($payload, $definition))) {
+            throw new UnexpectedValueException('The settings cache could not supply a valid primitive record payload.');
+        }
 
-            return $setting;
-        })->values();
+        return $payload;
+    }
+
+    /** @param array<string, bool|float|int|string|null> $attributes */
+    private function hydrate(array $attributes): Setting
+    {
+        $setting = SettingModelRegistry::newInstance();
+        $setting->setRawAttributes($attributes, true);
+        $setting->exists = true;
+        if ($setting->getRawOriginal('owner_scope_key') !== null) {
+            $this->boundary->assertRecord($setting, 'settings.values');
+        }
+
+        return $setting;
     }
 
     /**
@@ -81,29 +160,17 @@ final readonly class SettingCache
     public function identity(): SettingCacheIdentity
     {
         $model = SettingModelRegistry::newInstance();
-        $hashes = array_map(
-            static fn ($definition): string => $definition->hash(),
-            $this->definitions->all(),
-        );
-        sort($hashes);
-
         $attributes = $this->boundary->attributes('settings.values');
         $ownership = isset($attributes['owner_scope_key'])
             ? $this->boundary->key('settings.values', 'records')
             : 'disabled';
 
-        return $this->makeIdentity($model, $ownership, $hashes);
+        return $this->makeIdentity($model, $ownership, $this->definitionHash());
     }
 
     /** Derive a stable identity directly from a persisted row. */
     public function identityFor(Setting $setting): SettingCacheIdentity
     {
-        $hashes = array_map(
-            static fn ($definition): string => $definition->hash(),
-            $this->definitions->all(),
-        );
-        sort($hashes);
-
         $scope = $setting->getRawOriginal('owner_scope_key');
         if ($scope !== null) {
             if ($scope !== ($this->boundary->attributes('settings.values')['owner_scope_key'] ?? null)) {
@@ -114,14 +181,14 @@ final readonly class SettingCache
         return $this->makeIdentity(
             $setting,
             $scope !== null ? $this->boundary->key('settings.values', 'records') : 'disabled',
-            $hashes,
+            $this->definitionHash(),
         );
     }
 
     /** Forget one previously captured cache identity. */
     public function flushIdentity(SettingCacheIdentity $identity): void
     {
-        $this->cache->store($identity->store)->forget($identity->key);
+        $this->cache->store($identity->store)->forget($identity->key.':generation');
     }
 
     /**
@@ -138,9 +205,7 @@ final readonly class SettingCache
             return;
         }
 
-        $connection->afterCommit(fn (): bool => $this->cache
-            ->store($identity->store)
-            ->forget($identity->key));
+        $connection->afterCommit(fn () => $this->flushIdentity($identity));
     }
 
     /**
@@ -158,9 +223,17 @@ final readonly class SettingCache
      *
      * @return list<array<string, mixed>>
      */
-    private function fetchPayload(): array
+    private function fetchPayload(?Definition $definition = null): array
     {
-        return array_values($this->fetch()
+        $query = $this->boundary->query(SettingModelRegistry::query(), 'settings.values');
+        if ($definition !== null) {
+            $query->where('namespace', $definition->namespace)
+                ->where('scope', $definition->scope)
+                ->where('key', $definition->key)
+                ->limit(1);
+        }
+
+        return array_values($query->get()
             ->map(static fn (Setting $setting): array => $setting->getAttributes())
             ->values()
             ->all());
@@ -250,6 +323,29 @@ final readonly class SettingCache
         return true;
     }
 
+    /** @param list<array<string, bool|float|int|string|null>> $payload */
+    private function matchesDefinition(array $payload, Definition $definition): bool
+    {
+        return $payload === [] || (count($payload) === 1
+            && $payload[0]['namespace'] === $definition->namespace
+            && $payload[0]['scope'] === $definition->scope
+            && $payload[0]['key'] === $definition->key);
+    }
+
+    /** Rehash definitions only when their immutable object set changes. */
+    private function definitionHash(): string
+    {
+        $definitions = $this->definitions->all();
+        if ($this->definitionSet !== $definitions) {
+            $hashes = array_map(static fn (Definition $definition): string => $definition->hash(), $definitions);
+            sort($hashes);
+            $this->definitionFingerprint = hash('sha256', json_encode($hashes, JSON_THROW_ON_ERROR));
+            $this->definitionSet = $definitions;
+        }
+
+        return $this->definitionFingerprint;
+    }
+
     /**
      * Return the optional validated cache store.
      */
@@ -273,9 +369,9 @@ final readonly class SettingCache
     /**
      * Build one deterministic cache key without consulting ambient context.
      *
-     * @param  list<string>  $definitionHashes
+     * @param  string  $definitionHash  Fingerprint of the current immutable definition set.
      */
-    private function makeIdentity(Setting $setting, string $ownership, array $definitionHashes): SettingCacheIdentity
+    private function makeIdentity(Setting $setting, string $ownership, string $definitionHash): SettingCacheIdentity
     {
         $connection = $setting->getConnection();
 
@@ -293,7 +389,7 @@ final readonly class SettingCache
                 $connection->getConfig('schema'),
                 $connection->getTablePrefix().$setting->getTable(),
                 $ownership,
-                $definitionHashes,
+                $definitionHash,
             ], JSON_THROW_ON_ERROR)),
         ]));
     }

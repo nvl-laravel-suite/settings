@@ -49,8 +49,10 @@ it('bounds source reads when a staged import exceeds its declared row count', fu
             'expected_count' => 1,
             'key_replacements' => ['first' => 'core.enabled'],
         ]))->toThrow(InvalidArgumentException::class);
-        $query = collect(DB::getQueryLog())->first(fn (array $entry): bool => str_contains($entry['query'], 'from "oversized_settings"'));
-        expect($query['query'])->toContain('limit 2')
+        $source = 'from '.DB::connection()->getQueryGrammar()->wrapTable('oversized_settings');
+        $query = collect(DB::getQueryLog())->first(fn (array $entry): bool => str_contains($entry['query'], $source));
+        expect($query)->not->toBeNull()
+            ->and($query['query'])->toContain('limit 2')
             ->and(Setting::query()->count())->toBe(0);
     } finally {
         DB::disableQueryLog();

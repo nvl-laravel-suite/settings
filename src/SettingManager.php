@@ -22,8 +22,7 @@ final readonly class SettingManager implements SettingRepository
     public function get(string $key): mixed
     {
         $definition = $this->definitions->get($key);
-        $record = $this->cache->records()
-            ->first(static fn (Setting $setting): bool => $setting->fullKey() === $key);
+        $record = $this->cache->record($key);
 
         return $record instanceof Setting ? $record->resolved() : $definition->default;
     }

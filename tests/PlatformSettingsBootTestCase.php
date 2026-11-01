@@ -29,7 +29,7 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
      */
     protected function setUp(): void
     {
-        if (getenv('NVL_FULL_DATABASE') === '1' && getenv('DB_CONNECTION') !== 'sqlite') {
+        if ((getenv('NVL_C1_TEST_DRIVER') !== false || getenv('NVL_FULL_DATABASE') === '1') && getenv('DB_CONNECTION') !== 'sqlite') {
             $this->databasePath = getenv('DB_DATABASE') ?: 'testing';
             parent::setUp();
 
@@ -84,7 +84,7 @@ abstract class PlatformSettingsBootTestCase extends Orchestra
      */
     protected function defineEnvironment($app): void
     {
-        $driver = getenv('NVL_FULL_DATABASE') === '1' ? (getenv('DB_CONNECTION') ?: 'sqlite') : 'sqlite';
+        $driver = getenv('NVL_C1_TEST_DRIVER') ?: (getenv('NVL_FULL_DATABASE') === '1' ? (getenv('DB_CONNECTION') ?: 'sqlite') : 'sqlite');
 
         $app['config']->set([
             'database.default' => $driver,
