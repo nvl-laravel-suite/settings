@@ -256,7 +256,9 @@ final class Nvl\Settings\Facades\Setting extends Illuminate\Support\Facades\Faca
 
 ```text
 class Nvl\Settings\Models\Setting extends Illuminate\Database\Eloquent\Model implements Nvl\Support\Ownership\Contracts\Ownable
-public function delete(): ?bool
+public function delete(): mixed
+@return ($this is Pivot ? (bool | int | null) : (bool | null))
+resolved @return ($this is Illuminate\Database\Eloquent\Relations\Pivot ? (bool | int | null) : (bool | null))
 public function fresh(mixed $with=[]): ?static
 @param (array<array-key, mixed> | string) $with
 public function fullKey(): string
