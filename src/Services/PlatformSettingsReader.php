@@ -51,10 +51,8 @@ final readonly class PlatformSettingsReader
             return true;
         }
 
-        if ($schema->hasColumn($setting->getTable(), 'owner_scope_key')
-            || $schema->hasColumn($setting->getTable(), 'owner_reference')
-            || $schema->hasColumn($setting->getTable(), 'tenant_id')
-            || $schema->hasColumn($setting->getTable(), 'ownership_key')) {
+        $columns = array_map(strtolower(...), $schema->getColumnListing($setting->getTable()));
+        if (array_intersect(['owner_scope_key', 'owner_reference', 'tenant_id', 'ownership_key'], $columns) !== []) {
             throw new OwnershipConfigurationInvalid('Settings ownership storage exists without an active ownership declaration.');
         }
 
@@ -62,16 +60,17 @@ final readonly class PlatformSettingsReader
     }
 
     /**
-     * Return legacy platform rows limited to config-mapped definitions.
+     * Return legacy platform rows limited to config-mapped definitions, or null when no platform store exists.
+     * The store is inspected once per call, so callers must not pair this with available().
      *
-     * @return Collection<int, Setting>
+     * @return Collection<int, Setting>|null
      *
      * @throws OwnershipConfigurationInvalid When storage and declared ownership disagree
      */
-    public function records(): Collection
+    public function records(): ?Collection
     {
         if (! $this->available()) {
-            return SettingModelRegistry::newInstance()->newCollection();
+            return null;
         }
 
         $definitions = array_filter(

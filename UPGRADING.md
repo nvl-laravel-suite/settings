@@ -28,4 +28,8 @@ Version 1 adoption manifests require an `expected_revisions` object keyed by eve
 
 Enable and adopt native Ownership separately before using owner scopes. The retired Tenancy bridge is no longer a Settings authority source. Unresolved native context fails closed. Keep config mapped definitions central and opt into `nvl-settings.overrides.enabled`; wrap request work in `PlatformSettingsRuntime::run` where required. Job hooks restore the preceding configuration after success, nested execution or failure. Settings no longer installs management routes or middleware automatically. Recreate only your host's authorized HTTP surface.
 
+## Validity window storage
+
+Migration `2026_11_11_000000_nvl_settings_store_setting_validity_as_datetime` converts `valid_from` and `valid_until` to `DATETIME` on MySQL and MariaDB and changes nothing on other drivers. Vendor-loaded migrations pick it up with `php artisan migrate`; hosts that own published migrations must publish and run it. Its rollback refuses to narrow the columns while a stored window lies outside 1970-2038.
+
 See [README](README.md) for current service signatures and [events](docs/events.md) for event fields.

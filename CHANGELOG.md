@@ -5,6 +5,16 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Inspect the platform settings store once per config projection instead of twice, and read its columns in one schema query.
+- Return a definition default with the runtime type of its stored fallback (decimal text, integers, date objects) before the first synchronization.
+- Deny a config mapping whose target contains a denied key, such as `app` when `app.key` is denied.
+- Keep an equivalent `SettingWriter::set` a no-op on MySQL, where JSON storage reorders definition metadata keys.
+- Store decimal text without the surrounding whitespace that numeric strings permit.
+- Run the row checks of `nvl:settings:doctor` on a connection with a table prefix.
+- Store validity windows in `DATETIME` columns on MySQL and MariaDB through a new migration, so windows after 2038 or inside a server time zone transition are no longer rejected.
+
 ## [7.0.1] - 2026-11-09
 
 ### Changed

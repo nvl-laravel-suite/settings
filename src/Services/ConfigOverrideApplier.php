@@ -34,11 +34,13 @@ final readonly class ConfigOverrideApplier
         if (in_array($this->ownership->snapshot()->mode, [OwnershipContextMode::Owner, OwnershipContextMode::Unresolved], true)) {
             throw new OwnershipViolation('Configuration projection requires the package bootstrap boundary.');
         }
-        if (! (bool) config('nvl-settings.overrides.enabled', false)
-            || ! $this->settings->available()) {
+        if (! (bool) config('nvl-settings.overrides.enabled', false)) {
             return;
         }
 
-        $this->writer->apply($this->settings->records());
+        $records = $this->settings->records();
+        if ($records !== null) {
+            $this->writer->apply($records);
+        }
     }
 }

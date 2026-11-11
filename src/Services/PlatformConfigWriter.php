@@ -65,7 +65,7 @@ final readonly class PlatformConfigWriter
     }
 
     /**
-     * Determine whether one definition may override its target.
+     * Determine whether one definition may override its target. A target that contains a denied key is denied too.
      */
     private function mayOverride(Definition $definition): bool
     {
@@ -76,7 +76,8 @@ final readonly class PlatformConfigWriter
         $denied = config('nvl-settings.overrides.denied', []);
 
         foreach (is_array($denied) ? $denied : [] as $pattern) {
-            if (is_string($pattern) && Str::is($pattern, $definition->overrides)) {
+            if (is_string($pattern)
+                && (Str::is($pattern, $definition->overrides) || str_starts_with($pattern, $definition->overrides.'.'))) {
                 return false;
             }
         }

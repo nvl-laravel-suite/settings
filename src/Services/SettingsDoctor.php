@@ -175,20 +175,22 @@ final readonly class SettingsDoctor
                 : 'Duplicate setting identities must be resolved.',
         );
         $connection = DB::connection($model->getConnectionName());
-        $query = $connection->table($table.' as settings_doctor');
+        $query = $connection->table($table);
+        // Patterns keep the reserved `key` column and a prefixed table out of raw SQL.
+        $longer = str_repeat('_', DefinitionRepository::MAX_SEGMENT_LENGTH + 1).'%';
         $invalidRowsExist = (clone $query)
-            ->where(static function (Builder $query): void {
+            ->where(static function (Builder $query) use ($longer): void {
                 $query
                     ->whereNull('namespace')
                     ->orWhere('namespace', '')
                     ->orWhereNull('key')
                     ->orWhere('key', '')
-                    ->orWhereRaw('LENGTH(settings_doctor.namespace) > ?', [100])
-                    ->orWhereRaw('LENGTH(settings_doctor.scope) > ?', [100])
-                    ->orWhereRaw('LENGTH(settings_doctor.key) > ?', [100])
+                    ->orWhere('namespace', 'like', $longer)
+                    ->orWhere('scope', 'like', $longer)
+                    ->orWhere('key', 'like', $longer)
                     ->orWhere('revision', '<', 1)
                     ->orWhereNull('definition_hash')
-                    ->orWhereRaw('LENGTH(settings_doctor.definition_hash) <> ?', [64])
+                    ->orWhereRaw('LENGTH(definition_hash) <> ?', [64])
                     ->orWhere(static function (Builder $query): void {
                         $query
                             ->where('has_override', false)

@@ -135,7 +135,7 @@ enum SettingType: string
         }
 
         if (is_string($value) && is_numeric($value)) {
-            return $value;
+            return trim($value, " \t\n\r\v\f");
         }
 
         throw new InvalidArgumentException('Decimal settings require a finite numeric value.');

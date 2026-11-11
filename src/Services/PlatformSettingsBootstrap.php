@@ -34,11 +34,13 @@ final readonly class PlatformSettingsBootstrap
             throw new OwnershipViolation('Platform configuration bootstrap has ended.');
         }
 
-        if (! (bool) config('nvl-settings.overrides.enabled', false)
-            || ! $this->settings->available()) {
+        if (! (bool) config('nvl-settings.overrides.enabled', false)) {
             return;
         }
 
-        $this->writer->apply($this->settings->records());
+        $records = $this->settings->records();
+        if ($records !== null) {
+            $this->writer->apply($records);
+        }
     }
 }

@@ -145,17 +145,21 @@ final readonly class SettingWriter
                 throw StaleSettingVersionException::forKey($key);
             }
             if (! $created) {
+                // JSON storage may reorder metadata keys, so only a changed definition rewrites them.
+                $definitionChanged = $setting->definition_hash !== $definition->hash();
                 $setting->fill([
                     'type' => $definition->type,
                     'value' => $value,
                     'has_override' => true,
                     'fallback' => $definition->default,
-                    'metadata' => $definition->metadata,
                     'definition_hash' => $definition->hash(),
                     'orphaned_at' => null,
                     'valid_from' => $validFrom,
                     'valid_until' => $validUntil,
                 ]);
+                if ($definitionChanged) {
+                    $setting->metadata = $definition->metadata;
+                }
                 if ($setting->isDirty()) {
                     $setting->synced_at = now();
                     $setting->save();

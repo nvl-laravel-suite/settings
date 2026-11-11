@@ -293,7 +293,7 @@ final class DefinitionRepository
                         scope: (string) $scope,
                         key: (string) $key,
                         type: $type,
-                        default: $config['default'] ?? null,
+                        default: $type->deserialize($type->serialize($config['default'])),
                         description: $description,
                         rules: array_values($rules),
                         position: $position,
@@ -513,7 +513,7 @@ final class DefinitionRepository
                 scope: $scope,
                 key: $key,
                 type: $config['type'],
-                default: $config['default'] ?? null,
+                default: $config['type']->deserialize($config['type']->serialize($config['default'] ?? null)),
                 description: $config['description'] ?? '',
                 rules: $rules,
                 position: $config['position'] ?? 0,
@@ -556,6 +556,7 @@ final class DefinitionRepository
 
     /**
      * Ensure the source-controlled fallback satisfies its declared runtime rules.
+     * Callers then keep its codec round trip, so a definition default has the runtime type of a stored fallback.
      *
      * @param  list<mixed>  $rules
      */

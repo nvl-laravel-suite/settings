@@ -38,10 +38,10 @@ final class PlatformSettingsRuntime
             return;
         }
         try {
-            if (! $this->settings->available()) {
+            $records = $this->settings->records();
+            if ($records === null) {
                 return;
             }
-            $records = $this->settings->records();
             $this->originals[$frame] = $this->writer->snapshot();
             $this->writer->apply($records);
         } catch (Throwable $exception) {
