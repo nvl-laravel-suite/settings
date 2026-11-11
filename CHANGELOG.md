@@ -5,6 +5,8 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+## [7.0.2] - 2026-11-11
+
 ### Fixed
 
 - Inspect the platform settings store once per config projection instead of twice, and read its columns in one schema query.
@@ -14,6 +16,12 @@ All notable changes to `nvl/settings` are documented here.
 - Store decimal text without the surrounding whitespace that numeric strings permit.
 - Run the row checks of `nvl:settings:doctor` on a connection with a table prefix.
 - Store validity windows in `DATETIME` columns on MySQL and MariaDB through a new migration, so windows after 2038 or inside a server time zone transition are no longer rejected.
+
+<!-- NVL GENERATED CHANGES START -->
+### Changed
+
+- store setting validity as datetime and harden reads
+<!-- NVL GENERATED CHANGES END -->
 
 ## [7.0.1] - 2026-11-09
 
