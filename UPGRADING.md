@@ -30,6 +30,6 @@ Enable and adopt native Ownership separately before using owner scopes. The reti
 
 ## Validity window storage
 
-Migration `2026_11_11_000000_nvl_settings_store_setting_validity_as_datetime` converts `valid_from` and `valid_until` to `DATETIME` on MySQL and MariaDB and changes nothing on other drivers. Vendor-loaded migrations pick it up with `php artisan migrate`; hosts that own published migrations must publish and run it. Its rollback refuses to narrow the columns while a stored window lies outside 1970-2038.
+SQLite and PostgreSQL already store these validity windows without session time-zone conversion. Retain the validity migration filename in published migration histories.
 
 See [README](README.md) for current service signatures and [events](docs/events.md) for event fields.

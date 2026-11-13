@@ -6,6 +6,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\Queue;
 use Nvl\Ownership\Services\OwnershipRunner;
+use Nvl\Ownership\Tests\Fixtures\OptsIntoAdoptedSchemaReuse;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\ConfigOverrideApplier;
@@ -22,7 +23,7 @@ use Nvl\Support\Ownership\Contracts\OwnershipQueuedJob;
 use Nvl\Support\Ownership\Exceptions\OwnershipViolation;
 use Nvl\Support\Ownership\ValueObjects\OwnershipJobEnvelope;
 
-uses(OwnershipTestCase::class);
+uses(OwnershipTestCase::class, OptsIntoAdoptedSchemaReuse::class);
 
 it('isolates the same setting key and retained cache between native owners', function (): void {
     $manager = app(SettingManager::class);
