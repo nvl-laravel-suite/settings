@@ -33,7 +33,7 @@ Discovery defaults to `settings`, recursively includes PHP/JSON definitions, doe
 
 ## Read effective values and write with revisions
 
-Assume `$actor` is the host's explicit authenticated principal and management authorization has been configured. Eloquent actors are reloaded from canonical storage. For other `Authenticatable` providers the host must ensure fresh authority. `SystemActor::Background` requires a host `SettingsAuthorization` binding that explicitly permits the requested ability/key; the enum itself grants nothing.
+Assume `$actor` is the host's explicit authenticated principal and management authorization has been configured. Eloquent actors are reloaded from canonical storage on the write connection, in the writer and in every `nvl:adopt` phase. A vetoed model save throws `SettingWriteRejectedException` and publishes nothing. For other `Authenticatable` providers the host must ensure fresh authority. `SystemActor::Background` requires a host `SettingsAuthorization` binding that explicitly permits the requested ability/key; the enum itself grants nothing.
 
 ```php
 use Nvl\Settings\Contracts\SettingRepository;
@@ -110,6 +110,8 @@ After reviewing the plan, `nvl:settings:sync` reconciles definitions without ove
 
 For composite sources, specify `scope_column` and nest the key replacement map under each source scope. Use `value_encoding: "json"` for JSON source values and `preserve_identity: true` for UUIDs and UTC timestamps. An explicit `orphan_policy: "report"` leaves each reported source row intact. Include the reviewed `fingerprint` for extended manifests and run `--verify` after apply and before host cutover.
 
-For checkpointed batches, run `nvl:adopt settings plan|apply|verify|activate <manifest.json>` with the same manifest after enabling the Core adoption tables. Committed batches survive a failure; resume `apply` with `--run` and keep legacy writers stopped until verify and activate pass.
+For checkpointed batches, run `nvl:adopt settings plan|apply|verify|activate <manifest.json>` with the same manifest after enabling the Core adoption tables. Committed batches survive a failure; resume `apply` with `--run` and keep legacy writers stopped until verify and activate pass. A resume re-reads the committed source prefix and refuses when an override behind the cursor was deleted or changed; it never rewinds or rewrites it.
+
+Definitions are file-defined: unknown keys throw and `reset` never deletes a definition. There is no runtime API to create, rename, retype or delete definitions. Keep dynamic, runtime-managed settings and their lifecycle in the host, and adopt only overrides of definitions you have added to source.
 
 Apply writes and reconciliation share one target transaction, so a stale revision/count/definition mismatch rolls back the import. This imports an already-staged source; it does not invent key mappings or convert schemas. Doctor returns bounded `key`, `severity`, `passed`, `message` diagnostics. Test definitions, exact revisions, null/window behavior, configured models, real owner admission, actual cache/outer-rollback semantics and config restoration through focused host tests.

@@ -10,6 +10,7 @@ use Nvl\Settings\Contracts\SettingsAuthorization;
 use Nvl\Settings\Enums\SettingAbility;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingModelRegistry;
+use Nvl\Settings\Services\SettingsActorResolver;
 use Nvl\Settings\Services\SettingsAdoptionManifest;
 use Nvl\Settings\Services\SettingsAdoptionMapping;
 use Nvl\Support\Adoption\AdoptionAdapter;
@@ -46,6 +47,7 @@ final class SettingsAdoptionAdapter extends AdoptionAdapter
         private readonly SettingsAdoptionMapping $mapping,
         private readonly SettingsAdoptionManifest $manifests,
         private readonly SettingsAuthorization $authorization,
+        private readonly SettingsActorResolver $actors,
     ) {
         parent::__construct($actor, $options);
     }
@@ -55,11 +57,15 @@ final class SettingsAdoptionAdapter extends AdoptionAdapter
         return SettingModelRegistry::newInstance()->getConnection();
     }
 
+    /**
+     * Authorize the actor's current persisted record, never the instance passed in, for every mapped target.
+     */
     public function authorize(string $phase): void
     {
+        $actor = $this->actors->resolve($this->actor);
         $ability = in_array($phase, ['apply', 'activate'], true) ? SettingAbility::Set : SettingAbility::View;
         foreach ($this->manifests->normalize($this->options)['key_replacements'] as $targetKey) {
-            $this->authorization->authorize($this->actor, $ability, $targetKey);
+            $this->authorization->authorize($actor, $ability, $targetKey);
         }
     }
 
@@ -114,6 +120,30 @@ final class SettingsAdoptionAdapter extends AdoptionAdapter
         $last = $page === [] ? null : $page[array_key_last($page)];
 
         return new AdoptionBatch($step->id, $cursor, $last === null ? $cursor : $step->cursorFrom($last), $mapped, count($rows) <= $limit);
+    }
+
+    /**
+     * Re-read the committed source prefix and refuse the checkpoint when any mapped override is no longer staged.
+     *
+     * Orphans reported by the manifest have no target and are only counted.
+     */
+    public function assertCheckpoint(AdoptionStep $step, ?array $cursor, int $processed): void
+    {
+        $source = $this->mapping->source($this->options);
+        $rows = $step->through($this->mapping->query($source), $cursor)->limit($processed + 1)->get();
+        if ($rows->count() !== $processed) {
+            throw new AdoptionException("Settings adoption checkpoint of step [{$step->id}] counts {$processed} source rows, but its committed source prefix holds {$rows->count()}.");
+        }
+        foreach ($rows as $row) {
+            $override = $this->mapping->map($source, $this->mapping->identify($source, $row)['identity'], $row);
+            if ($override === null) {
+                continue;
+            }
+            $record = $this->mapping->targetRecord($override['target']);
+            if (! $record instanceof Setting || ! $this->mapping->matches($override['target'], $record, $override['row'])) {
+                throw new AdoptionException("Adoption drift behind the cursor: settings adoption target [{$override['target']}] is no longer staged from its source.");
+            }
+        }
     }
 
     public function writeBatch(AdoptionBatch $batch): ?string

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Nvl\Settings\Contracts\SettingRepository;
@@ -158,4 +159,32 @@ it('diagnoses a settings table on a prefixed connection', function (): void {
         $connection->setTablePrefix('');
         config()->set('nvl-settings.tables.settings', $table);
     }
+});
+
+it('doctor rejects partial setting identity uniqueness', function (): void {
+    $setting = new Setting;
+    $connection = $setting->getConnection();
+    $table = $setting->getTable();
+    $columns = ['namespace', 'scope', 'key'];
+    $identity = static fn (): array => collect(app(SettingsDoctor::class)->inspect())->firstWhere('key', 'schema.index.identity');
+    $unique = collect($connection->getSchemaBuilder()->getIndexes($table))
+        ->first(static fn (array $index): bool => $index['unique'] && ! $index['primary'] && $index['columns'] === $columns);
+
+    expect($unique)->toBeArray()
+        ->and($identity()['passed'])->toBeTrue();
+
+    $connection->getSchemaBuilder()->table($table, static function (Blueprint $blueprint) use ($unique): void {
+        $blueprint->dropUnique($unique['name']);
+    });
+    $grammar = $connection->getQueryGrammar();
+    $connection->statement('CREATE UNIQUE INDEX '.$grammar->wrap('settings_partial_identity_unique').' ON '.$grammar->wrapTable($table)
+        .' ('.$grammar->columnize($columns).') WHERE '.$grammar->wrap('orphaned_at').' IS NULL');
+
+    expect(collect($connection->getSchemaBuilder()->getIndexes($table))->firstWhere('name', 'settings_partial_identity_unique'))
+        ->toMatchArray(['columns' => $columns, 'unique' => true])
+        ->and($identity())->toMatchArray([
+            'severity' => 'error',
+            'passed' => false,
+            'message' => 'The required identity index is missing, partial or not ready.',
+        ]);
 });

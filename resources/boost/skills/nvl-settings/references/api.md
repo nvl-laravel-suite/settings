@@ -18,6 +18,7 @@ Search for the relevant fully qualified service or contract and read only its ma
 - `Nvl\Settings\Exceptions\DuplicateSettingException`
 - `Nvl\Settings\Exceptions\InvalidDefinitionException`
 - `Nvl\Settings\Exceptions\SettingException`
+- `Nvl\Settings\Exceptions\SettingWriteRejectedException`
 - `Nvl\Settings\Exceptions\StaleSettingVersionException`
 - `Nvl\Settings\Exceptions\UnknownSettingException`
 - `Nvl\Settings\Facades\Setting`
@@ -202,6 +203,23 @@ public function translationParameters(): array
 
 ```text
 abstract class Nvl\Settings\Exceptions\SettingException extends Exception implements Nvl\Support\Contracts\RespondableException
+public function package(): string
+public function publicContext(): array
+@return array<string, mixed>
+public function responseCode(): ?string
+public function responseHeaders(): array
+@return array<string, string>
+public function suggestedStatus(): int
+public function translationKey(): ?string
+public function translationParameters(): array
+@return array<string, (scalar | null)>
+```
+
+## Nvl\Settings\Exceptions\SettingWriteRejectedException
+
+```text
+final class Nvl\Settings\Exceptions\SettingWriteRejectedException extends Nvl\Settings\Exceptions\SettingException
+public static function forKey(string $key): self
 public function package(): string
 public function publicContext(): array
 @return array<string, mixed>
@@ -402,7 +420,7 @@ resolved @return Illuminate\Pagination\LengthAwarePaginator<int, array{definitio
 
 ```text
 final readonly class Nvl\Settings\Services\SettingWriter
-public function __construct(Illuminate\Database\DatabaseManager $database, Nvl\Settings\Services\SettingValueValidator $values, Nvl\Settings\Services\SettingCache $cache, Nvl\Support\Ownership\Contracts\OwnershipBoundary $boundary, Nvl\Settings\Services\SettingCreator $creator, Nvl\Settings\Support\DefinitionRepository $definitions, Nvl\Settings\Contracts\SettingsAuthorization $authorization, Nvl\Settings\Contracts\SettingsAuditContextProvider $auditContext, Nvl\Support\Ownership\Contracts\OwnershipContext $ownershipContext, Nvl\Support\Events\DomainEventDispatcher $domainEvents): mixed
+public function __construct(Illuminate\Database\DatabaseManager $database, Nvl\Settings\Services\SettingValueValidator $values, Nvl\Settings\Services\SettingCache $cache, Nvl\Support\Ownership\Contracts\OwnershipBoundary $boundary, Nvl\Settings\Services\SettingCreator $creator, Nvl\Settings\Support\DefinitionRepository $definitions, Nvl\Settings\Contracts\SettingsAuthorization $authorization, Nvl\Settings\Contracts\SettingsAuditContextProvider $auditContext, Nvl\Support\Ownership\Contracts\OwnershipContext $ownershipContext, Nvl\Support\Events\DomainEventDispatcher $domainEvents, Nvl\Settings\Services\SettingsActorResolver $actors): mixed
 public function reset(string $key, Illuminate\Contracts\Auth\Authenticatable|Nvl\Support\Enums\SystemActor $actor, int $expectedRevision): array
 @return Resolved
 resolved @return array{key: string, value: mixed, source: string, type: Nvl\Settings\Enums\SettingType, revision: int, definition_hash: string, has_override: bool, orphaned: bool, valid_from: ?string, valid_until: ?string}
@@ -433,7 +451,7 @@ resolved @return array{mode: string, source_table: string, schema_fingerprint: s
 
 ```text
 final readonly class Nvl\Settings\Services\SettingsDoctor
-public function __construct(Nvl\Settings\Support\DefinitionRepository $definitions): mixed
+public function __construct(Nvl\Settings\Support\DefinitionRepository $definitions, Nvl\Support\Ownership\Services\OwnershipConstraintInspector $constraints): mixed
 public function inspect(): array
 @return list<Check>
 resolved @return list<array{key: string, severity: ('error' | 'warning' | 'info'), passed: bool, message: string}>

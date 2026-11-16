@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nvl\Settings\Services;
 
 use Illuminate\Database\UniqueConstraintViolationException;
+use Nvl\Settings\Exceptions\SettingWriteRejectedException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Support\Ownership\Contracts\OwnershipWriter;
 
@@ -25,7 +26,9 @@ final readonly class SettingCreator
             $this->writer->create(SettingModelRegistry::modelClass(), static function (array $ownership) use ($attributes): Setting {
                 $setting = SettingModelRegistry::newInstance();
                 $setting->setRawAttributes([...$attributes, ...$ownership]);
-                $setting->save();
+                if (! $setting->save()) {
+                    throw SettingWriteRejectedException::forKey($setting->fullKey());
+                }
 
                 return $setting;
             });

@@ -5,6 +5,21 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- `SettingWriter` and the `nvl:adopt` settings adapter reload Eloquent actors through Core's `CanonicalActorResolver` on the write connection before every write and every adoption phase, so a lagging read replica, revoked, deleted or substituted actor cannot authorize. The writer's own actor resolver was removed.
+- A vetoed `set`, `reset`, create or sync prune save now throws `SettingWriteRejectedException` before cache invalidation or `SettingChanged`, instead of reporting success.
+- `SettingsDoctor` requires a complete, valid and ready unique index on the setting identity; a partial unique index no longer passes `schema.index.identity`.
+- Resuming `nvl:adopt settings` re-reads the committed source prefix through `assertCheckpoint()` and refuses when a staged override behind the cursor was deleted or changed, for incomplete and completed steps alike.
+
+### Added
+
+- `Nvl\Settings\Exceptions\SettingWriteRejectedException`, a `SettingException` that maps to `operation_failed`.
+
+### Changed
+
+- Documented that definitions stay file-defined: dynamic runtime definitions are host-owned, and adoption imports only overrides of file-defined settings.
+
 ## [7.2.0] - 2026-11-16
 
 ### Added

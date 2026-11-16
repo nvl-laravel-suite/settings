@@ -10,6 +10,7 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -20,14 +21,18 @@ use Nvl\Settings\Definitions\Tables\SettingsTables;
 use Nvl\Settings\Enums\SettingAbility;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Events\SettingChanged;
+use Nvl\Settings\Exceptions\SettingWriteRejectedException;
 use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingsAdopter;
 use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
+use Nvl\Settings\Tests\Fixtures\OwnershipActor;
 use Nvl\Settings\Tests\SettingsCacheTestCase;
+use Nvl\Support\Adoption\AdoptionCoordinator;
 use Nvl\Support\Adoption\AdoptionProgress;
+use Nvl\Support\Adoption\AdoptionRegistry;
 use Nvl\Support\Adoption\AdoptionStore;
 use Nvl\Support\Enums\SystemActor;
 
@@ -517,4 +522,158 @@ it('refuses nvl:adopt plans whose expected revisions name unmapped targets', fun
     } finally {
         $filesystem->delete($path);
     }
+});
+
+/**
+ * Stage three legacy overrides for nvl:adopt and return the manifest path.
+ */
+function settingsStageBatchedAdoption(SettingsCacheTestCase $test, string $table): string
+{
+    $test->artisan('migrate', ['--path' => __DIR__.'/../../core/support/database/migrations', '--realpath' => true])->assertSuccessful();
+    $test->defineSettings([
+        'core.first' => ['type' => SettingType::Boolean, 'default' => false],
+        'core.second' => ['type' => SettingType::Text, 'default' => 'none'],
+        'core.third' => ['type' => SettingType::Boolean, 'default' => true],
+    ]);
+    Schema::create($table, function (Blueprint $blueprint): void {
+        $blueprint->string('key')->primary();
+        $blueprint->text('value');
+    });
+    DB::table($table)->insert([
+        ['key' => 'a.first', 'value' => '1'], ['key' => 'b.second', 'value' => 'staged'], ['key' => 'c.third', 'value' => '0'],
+    ]);
+    $path = storage_path('framework/testing/'.$table.'-'.Str::uuid().'.json');
+    app(Filesystem::class)->ensureDirectoryExists(dirname($path));
+    app(Filesystem::class)->put($path, json_encode([
+        'version' => 1, 'source_table' => $table, 'expected_count' => 3,
+        'key_replacements' => ['a.first' => 'core.first', 'b.second' => 'core.second', 'c.third' => 'core.third'],
+        'expected_revisions' => ['core.first' => 0, 'core.second' => 0, 'core.third' => 0],
+    ], JSON_THROW_ON_ERROR));
+
+    return $path;
+}
+
+it('refuses to resume nvl:adopt after a staged override behind the cursor was deleted', function (bool $complete): void {
+    /** @var SettingsCacheTestCase $this */
+    $path = settingsStageBatchedAdoption($this, 'legacy_checkpointed_settings');
+    app()->instance(SettingsAuthorization::class, new class implements SettingsAuthorization
+    {
+        public function authorize(Authenticatable|SystemActor $actor, SettingAbility $ability, ?string $key = null): void {}
+    });
+
+    try {
+        $plan = settingsAdoptCommand(['phase' => 'plan', 'manifest' => $path]);
+        if (! $complete) {
+            $interrupted = false;
+            DB::connection()->beforeExecuting(static function (string $sql, array $bindings) use (&$interrupted): void {
+                if (! $interrupted && str_starts_with($sql, 'insert') && in_array('second', $bindings, true)) {
+                    $interrupted = true;
+                    throw new RuntimeException('simulated batch failure');
+                }
+            });
+        }
+        $first = settingsAdoptCommand(['phase' => 'apply', 'manifest' => $path, '--fingerprint' => $plan['fingerprint'], '--batch-size' => 1]);
+        expect($first['status'])->toBe($complete ? 0 : 1)
+            ->and(Setting::query()->count())->toBe($complete ? 3 : 1);
+        $run = (string) DB::table(AdoptionStore::Runs)->value('id');
+        Setting::query()->where('key', 'first')->delete();
+        Event::fake([SettingChanged::class]);
+
+        $resumed = settingsAdoptCommand(['phase' => 'apply', 'manifest' => $path, '--fingerprint' => $plan['fingerprint'], '--run' => $run, '--batch-size' => 1]);
+
+        expect($resumed['status'])->toBe(1)
+            ->and($resumed['error'])->toContain('Adoption drift behind the cursor: settings adoption target [core.first] is no longer staged from its source.')
+            ->and(Setting::query()->orderBy('key')->pluck('key')->all())->toBe($complete ? ['second', 'third'] : [])
+            ->and(DB::table(AdoptionStore::Runs)->value('status'))->toBe($complete ? AdoptionProgress::Applied : AdoptionProgress::Failed);
+        Event::assertNotDispatched(SettingChanged::class);
+    } finally {
+        app(Filesystem::class)->delete($path);
+    }
+})->with(['incomplete cursor' => false, 'completed step' => true]);
+
+it('authorizes the current persisted nvl:adopt actor in every phase', function (string $phase, string $identity): void {
+    /** @var SettingsCacheTestCase $this */
+    $path = settingsStageBatchedAdoption($this, 'legacy_actor_settings');
+    Schema::create('settings_test_actors', function (Blueprint $table): void {
+        $table->id();
+        $table->boolean('may_manage');
+    });
+    config()->set('nvl-settings.management.authorization_ability', 'manage-settings');
+    Gate::define('manage-settings', static fn (OwnershipActor $principal): bool => (bool) $principal->getAttribute('may_manage'));
+    $actor = OwnershipActor::query()->create(['may_manage' => true]);
+    $manifest = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+    $coordinator = static fn (): AdoptionCoordinator => new AdoptionCoordinator(app(AdoptionRegistry::class)->make('settings', $actor, $manifest));
+    $phases = ['plan', 'apply', 'verify', 'activate'];
+
+    try {
+        $fingerprint = $coordinator()->plan()->fingerprint;
+        foreach (array_slice($phases, 1, array_search($phase, $phases, true) - 1) as $earlier) {
+            match ($earlier) {
+                'apply' => $coordinator()->apply($fingerprint),
+                'verify' => $coordinator()->verify(),
+            };
+        }
+        $runs = DB::table(AdoptionStore::Runs)->get()->all();
+        $settings = Setting::query()->orderBy('key')->get(['key', 'revision'])->toArray();
+        match ($identity) {
+            'modified' => [OwnershipActor::query()->whereKey($actor->getKey())->update(['may_manage' => false]), $actor->setAttribute('may_manage', true)],
+            'revoked' => OwnershipActor::query()->whereKey($actor->getKey())->update(['may_manage' => false]),
+            'deleted' => OwnershipActor::query()->whereKey($actor->getKey())->delete(),
+            'substituted' => $actor->setTable('substituted_actors'),
+        };
+
+        expect(fn () => match ($phase) {
+            'plan' => $coordinator()->plan(),
+            'apply' => $coordinator()->apply($fingerprint),
+            'verify' => $coordinator()->verify(),
+            'activate' => $coordinator()->activate($fingerprint),
+        })->toThrow(AuthorizationException::class)
+            ->and(DB::table(AdoptionStore::Runs)->get()->all())->toEqual($runs)
+            ->and(Setting::query()->orderBy('key')->get(['key', 'revision'])->toArray())->toBe($settings);
+    } finally {
+        app(Filesystem::class)->delete($path);
+    }
+})->with(['plan', 'apply', 'verify', 'activate'])->with(['modified', 'revoked', 'deleted', 'substituted']);
+
+it('rejects an empty nvl:adopt actor identifier before the host policy', function (): void {
+    /** @var SettingsCacheTestCase $this */
+    $path = settingsStageBatchedAdoption($this, 'legacy_empty_actor_settings');
+    config()->set('nvl-settings.management.authorization_ability', 'admit-anyone');
+    Gate::define('admit-anyone', static fn (GenericUser $principal): bool => true);
+    $manifest = json_decode((string) file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+
+    try {
+        expect(fn () => (new AdoptionCoordinator(app(AdoptionRegistry::class)->make('settings', new GenericUser(['id' => '']), $manifest)))->plan())
+            ->toThrow(AuthorizationException::class, 'Settings mutations require a persisted actor.');
+    } finally {
+        app(Filesystem::class)->delete($path);
+    }
+});
+
+it('rolls back earlier adoption writes when a later setting save is vetoed', function (): void {
+    /** @var SettingsCacheTestCase $this */
+    $this->defineSettings([
+        'core.first' => ['type' => SettingType::Boolean, 'default' => false],
+        'core.second' => ['type' => SettingType::Boolean, 'default' => false],
+    ]);
+    Schema::create('legacy_vetoed_settings', function (Blueprint $table): void {
+        $table->string('key')->primary();
+        $table->text('value');
+    });
+    DB::table('legacy_vetoed_settings')->insert([['key' => 'first.old', 'value' => '1'], ['key' => 'second.old', 'value' => '1']]);
+    settingsSetForTest('core.first', false, 0);
+    settingsSetForTest('core.second', false, 0);
+    Event::fake([SettingChanged::class]);
+    Setting::updating(static fn (Setting $setting): bool => $setting->key !== 'second');
+    $manifest = [
+        'version' => 1, 'source_table' => 'legacy_vetoed_settings', 'expected_count' => 2,
+        'key_replacements' => ['first.old' => 'core.first', 'second.old' => 'core.second'],
+        'expected_revisions' => ['core.first' => 1, 'core.second' => 1],
+    ];
+
+    expect(fn () => app(SettingsAdopter::class)->execute($manifest, apply: true, actor: settingsTestActor()))
+        ->toThrow(SettingWriteRejectedException::class, 'Setting [core.second] write was rejected by its model.')
+        ->and(Setting::query()->orderBy('key')->get()->map(static fn (Setting $setting): array => [$setting->key, $setting->value, $setting->revision])->all())
+        ->toBe([['first', false, 1], ['second', false, 1]]);
+    Event::assertNotDispatched(SettingChanged::class);
 });

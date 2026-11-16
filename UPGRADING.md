@@ -28,6 +28,15 @@ Version 1 adoption manifests require an `expected_revisions` object keyed by eve
 
 Adoption runs through nvl:adopt with reviewed, checkpointed batches and an explicit activate step. Committed batches survive a failure. Keep writers stopped until verify and activate pass. SettingsAdopter::execute() stays atomic in 7.x. Run `php artisan nvl:adopt settings plan|apply|verify|activate <manifest.json>` with the same manifest `nvl:settings:adopt` takes; `apply` and `activate` require the reviewed `--fingerprint`, and a failed `apply` resumes with `--run`. Each batch writes its overrides through `SettingWriter` at the reviewed expected revision and commits with its checkpoint, so cache invalidation and `SettingChanged` fire once per committed write. A target that changed after it was staged blocks the plan instead of being overwritten. Publish and run the Core adoption migration (`nvl-core.adoption.migrations.enabled`) first. Batching happens only through `nvl:adopt`; `nvl:settings:adopt` and `SettingsAdopter::execute()` still roll back every target on any failure.
 
+## Unreleased: stricter writes, actors and adoption resume
+
+- Requires the Core release that adds `AdoptionAdapter::assertCheckpoint()`, which the settings adoption adapter implements to refuse resuming over deleted or changed staged overrides.
+- Eloquent actors are reloaded from the write connection in `SettingWriter` and in every `nvl:adopt settings` phase. Authorization failures now carry Core's messages (`A persisted canonical actor is required.`, `The actor is unavailable.`) instead of the writer's own; match on `AuthorizationException`, not its message.
+- A model observer or listener that returns `false` from `saving`, `updating`, `creating` or `deleting` on a setting now makes `set`, `reset` and `sync` throw `SettingWriteRejectedException` and roll back. Before, the call reported success. Remove such vetoes or handle the exception.
+- `nvl:settings:doctor` fails `schema.index.identity` for a partial, invalid or not-ready unique identity index. Replace it with the package's complete unique index.
+- A resumed `nvl:adopt settings apply` refuses when an override it already staged was deleted or changed. Find what removed or changed it and restore the staged row before resuming; the run never rewinds or rewrites it.
+- Definitions remain file-defined. Keep runtime create, rename, retype and delete of arbitrary settings in the host, and adopt only overrides of definitions added to source.
+
 ## Native ownership and configuration
 
 Enable and adopt native Ownership separately before using owner scopes. The retired Tenancy bridge is no longer a Settings authority source. Unresolved native context fails closed. Keep config mapped definitions central and opt into `nvl-settings.overrides.enabled`; wrap request work in `PlatformSettingsRuntime::run` where required. Job hooks restore the preceding configuration after success, nested execution or failure. Settings no longer installs management routes or middleware automatically. Recreate only your host's authorized HTTP surface.

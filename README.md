@@ -51,7 +51,9 @@ $reset = $writer->reset('site.title', $actor, expectedRevision: $created['revisi
 
 `$actor` is an explicit Laravel `Authenticatable` or `SystemActor`. Host code binds `SettingsAuthorization`, or sets `nvl-settings.management.authorization_ability` for a Gate checked with the supplied authenticated actor. The default binding denies system actors; background writes need an explicit host authorization binding. A system enum value or nullable principal never grants authority by itself.
 
-Eloquent actors are reloaded from their canonical storage before authorization. Modified in-memory permissions, deleted principals and substituted actor storage cannot grant access. Custom non-Eloquent principals remain the host policy's responsibility.
+Eloquent actors are reloaded from their canonical storage on the write connection before authorization, through Core's `CanonicalActorResolver`. Modified in-memory permissions, a lagging read replica, deleted principals and substituted actor storage cannot grant access. Custom non-Eloquent principals remain the host policy's responsibility.
+
+A model observer or listener that vetoes a `set`, `reset` or sync prune save throws `SettingWriteRejectedException`. The transaction rolls back, and no cache invalidation or `SettingChanged` event is published.
 
 Existing rows require their exact revision for `set` and `reset`; `null` cannot bypass compare and swap. Revision `0` is the create expectation. Equivalent writes and resets of uncustomized rows produce no event. Setting `valid_from` or `valid_until` to `null` clears that bound, while omitting a bound preserves it. Validity instants are stored as UTC seconds, including when input has an offset; an equivalent instant is a no-op. Windows are unavailable for config mapped definitions. The writer validates values, performs the scoped transaction and schedules cache invalidation and value free events after the actual outer commit. A rolled back transaction publishes neither.
 
@@ -65,6 +67,10 @@ Config overrides are opt in with `nvl-settings.overrides.enabled`. Definitions w
 
 Values, fallbacks and cache payloads are plaintext. Keep credentials and secrets in their owning secret systems, and review every definition's config target; the default denylist is not a classification of all sensitive `mail`, `services`, `session` or `auth` settings. Existing rows retain their synced fallback until successful definition synchronization. Build config caches on the deployment path, since configured discovery paths may be absolute.
 
+## Definitions are file-defined
+
+Definitions come only from configured source files or `DefinitionRepository::fake` in tests. Unknown keys throw, and `reset` clears an override; it never deletes a definition. The package has no runtime API to create, rename, retype or delete definitions. An application that manages arbitrary settings at runtime keeps that lifecycle and its table host-owned. Adoption imports only overrides of file-defined settings: map each legacy key to a definition you have added to source, and keep host-defined dynamic settings out of the manifest.
+
 ## Database caching and adoption
 
 `SettingCache` uses the configured key as a prefix, isolating entries by model, database source, table, ownership and definition hashes in both owned and unowned installations. Single-value runtime reads fetch and hydrate only the requested record. Cache entries include a partition generation captured before the database read; committed invalidation changes the generation so an in-flight stale fill cannot be reused. `nvl-settings.cache.ttl` defaults to 300 seconds and bounds the lifetime of obsolete generations. A transaction on the Settings connection reads its own writes without shared cache. Cache invalidation occurs after the real outer commit. `nvl:settings:cache` rebuilds discovery, while `nvl:settings:clear` clears its cache.
@@ -77,7 +83,7 @@ Freeze legacy writes while staging. For extended manifests, copy the plan's `fin
 
 Source reads stop after the declared count plus one sentinel row, rejecting oversized staging tables without loading all their values into application memory.
 
-For large sources, run `php artisan nvl:adopt settings plan|apply|verify|activate <manifest.json>` with the same manifest. It needs the Core adoption tables (`nvl-core.adoption.migrations.enabled`). `apply` and `activate` take the reviewed `--fingerprint`; a failed `apply` resumes with `--run`. Each committed batch writes through `SettingWriter` at the reviewed revision and survives a later failure, so keep legacy writers stopped until verify and activate pass. `nvl:settings:adopt` keeps its all-or-nothing transaction.
+For large sources, run `php artisan nvl:adopt settings plan|apply|verify|activate <manifest.json>` with the same manifest. It needs the Core adoption tables (`nvl-core.adoption.migrations.enabled`). `apply` and `activate` take the reviewed `--fingerprint`; a failed `apply` resumes with `--run`. Each committed batch writes through `SettingWriter` at the reviewed revision and survives a later failure, so keep legacy writers stopped until verify and activate pass. Before it accepts a stored checkpoint, `apply` re-reads the committed source prefix and refuses to resume if any override it already staged was deleted or changed; it never rewinds or rewrites that row. `nvl:settings:adopt` keeps its all-or-nothing transaction.
 
 ## Setting change subject reference
 

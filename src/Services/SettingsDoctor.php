@@ -11,6 +11,8 @@ use InvalidArgumentException;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingKey;
+use Nvl\Support\Ownership\Exceptions\OwnershipSchemaNotReady;
+use Nvl\Support\Ownership\Services\OwnershipConstraintInspector;
 use Throwable;
 
 /**
@@ -25,7 +27,10 @@ final readonly class SettingsDoctor
     /**
      * Create the Settings readiness inspector.
      */
-    public function __construct(private DefinitionRepository $definitions) {}
+    public function __construct(
+        private DefinitionRepository $definitions,
+        private OwnershipConstraintInspector $constraints,
+    ) {}
 
     /**
      * Return every Settings readiness check.
@@ -121,14 +126,25 @@ final readonly class SettingsDoctor
             passed: in_array($idType, ['uuid', 'guid', 'char', 'varchar', 'string'], true),
             message: "Settings identifier column uses [{$idType}].",
         );
+        $identityColumns = $owned
+            ? ['owner_scope_key', 'namespace', 'scope', 'key']
+            : ['namespace', 'scope', 'key'];
+        try {
+            $this->constraints->assertUniqueIndexes($schema->getConnection(), $table, [$identityColumns]);
+            $identityUnique = true;
+        } catch (OwnershipSchemaNotReady) {
+            $identityUnique = false;
+        }
+        $checks[] = $this->check(
+            key: 'schema.index.identity',
+            severity: 'error',
+            passed: $identityUnique,
+            message: $identityUnique
+                ? 'A complete unique index covers the required identity columns.'
+                : 'The required identity index is missing, partial or not ready.',
+        );
         $indexes = collect($schema->getIndexes($table));
         $requiredIndexes = [
-            'identity' => [
-                'columns' => $owned
-                    ? ['owner_scope_key', 'namespace', 'scope', 'key']
-                    : ['namespace', 'scope', 'key'],
-                'unique' => true,
-            ],
             'namespace-scope' => [
                 'columns' => ['namespace', 'scope'],
                 'unique' => false,
@@ -159,9 +175,6 @@ final readonly class SettingsDoctor
             );
         }
 
-        $identityColumns = $owned
-            ? ['owner_scope_key', 'namespace', 'scope', 'key']
-            : ['namespace', 'scope', 'key'];
         $duplicatesExist = SettingModelRegistry::query()
             ->select($identityColumns)
             ->groupBy($identityColumns)

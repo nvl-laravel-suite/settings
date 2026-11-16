@@ -15,6 +15,7 @@ use Nvl\Settings\Enums\SettingAbility;
 use Nvl\Settings\Enums\SettingPruneStrategy;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Events\SettingChanged;
+use Nvl\Settings\Exceptions\SettingWriteRejectedException;
 use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingReader;
@@ -22,6 +23,7 @@ use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
 use Nvl\Settings\Tests\Fixtures\OwnershipActor;
+use Nvl\Settings\Tests\Fixtures\ReplicatedActor;
 use Nvl\Support\Enums\SystemActor;
 
 uses(InteractsWithSettings::class);
@@ -53,6 +55,62 @@ it('authorizes Eloquent actors using canonical persisted attributes', function (
         ->and(Setting::query()->sole()->value)->toBeFalse();
     Event::assertNotDispatched(SettingChanged::class);
 })->with(['modified', 'deleted', 'revoked', 'table'])->with(['set', 'reset']);
+
+it('authorizes the actor from a current write PDO when a stale read PDO still grants access', function (string $operation): void {
+    $this->defineSettings(['catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false]]);
+    settingsSetForTest('catalog.enabled', false);
+    config()->set('database.connections.'.ReplicatedActor::Connection, ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
+    $connection = DB::connection(ReplicatedActor::Connection);
+    $connection->statement('CREATE TABLE settings_test_actors (id INTEGER PRIMARY KEY, may_manage BOOLEAN NOT NULL)');
+    $connection->table('settings_test_actors')->insert(['id' => 1, 'may_manage' => false]);
+    $replica = new PDO('sqlite::memory:');
+    $replica->exec('CREATE TABLE settings_test_actors (id INTEGER PRIMARY KEY, may_manage BOOLEAN NOT NULL)');
+    $replica->exec('INSERT INTO settings_test_actors (id, may_manage) VALUES (1, 1)');
+    $connection->setReadPdo($replica);
+    $actor = ReplicatedActor::query()->findOrFail(1);
+    Gate::define('manage-settings', static fn (ReplicatedActor $principal): bool => (bool) $principal->getAttribute('may_manage'));
+    Event::fake([SettingChanged::class]);
+    $writer = app(SettingWriter::class);
+
+    expect($actor->getAttribute('may_manage'))->toBeTruthy()
+        ->and(fn () => $operation === 'set'
+            ? $writer->set('catalog.enabled', true, $actor, 1)
+            : $writer->reset('catalog.enabled', $actor, 1))->toThrow(AuthorizationException::class)
+        ->and(Setting::query()->sole()->revision)->toBe(1);
+    Event::assertNotDispatched(SettingChanged::class);
+})->with(['set', 'reset']);
+
+it('rejects empty and non-scalar actor identifiers before the host policy', function (mixed $identifier, string $operation): void {
+    $this->defineSettings(['catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false]]);
+    settingsSetForTest('catalog.enabled', false);
+    config()->set('nvl-settings.management.authorization_ability', 'admit-anyone');
+    Gate::define('admit-anyone', static fn (GenericUser $principal): bool => true);
+    Event::fake([SettingChanged::class]);
+    $actor = new GenericUser(['id' => $identifier]);
+    $writer = app(SettingWriter::class);
+
+    expect(fn () => $operation === 'set'
+        ? $writer->set('catalog.enabled', true, $actor, 1)
+        : $writer->reset('catalog.enabled', $actor, 1))->toThrow(AuthorizationException::class, 'Settings mutations require a persisted actor.')
+        ->and(Setting::query()->sole()->revision)->toBe(1);
+    Event::assertNotDispatched(SettingChanged::class);
+})->with(['empty' => '', 'array' => [['user-1']], 'float' => 1.5])->with(['set', 'reset']);
+
+it('rejects vetoed set and reset without publishing changes', function (string $operation): void {
+    $this->defineSettings(['catalog.enabled' => ['type' => SettingType::Boolean, 'default' => false]]);
+    settingsSetForTest('catalog.enabled', false);
+    Event::fake([SettingChanged::class]);
+    Setting::updating(static fn (): bool => false);
+    $writer = app(SettingWriter::class);
+
+    expect(fn () => $operation === 'set'
+        ? $writer->set('catalog.enabled', true, settingsTestActor(), 1)
+        : $writer->reset('catalog.enabled', settingsTestActor(), 1))->toThrow(SettingWriteRejectedException::class, 'Setting [catalog.enabled] write was rejected by its model.')
+        ->and(Setting::query()->sole()->revision)->toBe(1)
+        ->and(Setting::query()->sole()->value)->toBeFalse()
+        ->and(Setting::query()->sole()->has_override)->toBeTrue();
+    Event::assertNotDispatched(SettingChanged::class);
+})->with(['set', 'reset']);
 
 it('requires explicit actor policy and revision for an existing override', function (): void {
     $this->defineSettings(['catalog.value' => ['type' => SettingType::Integer, 'default' => 3]]);

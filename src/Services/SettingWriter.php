@@ -12,7 +12,6 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Connection;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +23,7 @@ use Nvl\Settings\Enums\SettingPruneStrategy;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Events\SettingChanged;
 use Nvl\Settings\Exceptions\DuplicateSettingException;
+use Nvl\Settings\Exceptions\SettingWriteRejectedException;
 use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
@@ -62,6 +62,7 @@ final readonly class SettingWriter
         private SettingsAuditContextProvider $auditContext,
         private OwnershipContext $ownershipContext,
         private DomainEventDispatcher $domainEvents,
+        private SettingsActorResolver $actors,
     ) {}
 
     /**
@@ -100,7 +101,7 @@ final readonly class SettingWriter
      */
     private function setValue(string $key, mixed $value, Authenticatable|SystemActor $actor, ?int $expectedRevision, array $options, ?array $source = null): array
     {
-        $actor = $this->resolveActor($actor);
+        $actor = $this->actors->resolve($actor);
         $this->authorization->authorize($actor, SettingAbility::Set, $key);
         if (array_diff(array_keys($options), ['valid_from', 'valid_until']) !== []) {
             throw new InvalidArgumentException('Unknown setting mutation option.');
@@ -205,7 +206,9 @@ final readonly class SettingWriter
                 }
                 if ($setting->isDirty()) {
                     $setting->synced_at = now();
-                    $setting->save();
+                    if (! $setting->save()) {
+                        throw SettingWriteRejectedException::forKey($key);
+                    }
                     $setting->refresh();
                 }
             }
@@ -225,7 +228,7 @@ final readonly class SettingWriter
      */
     public function reset(string $key, Authenticatable|SystemActor $actor, int $expectedRevision): array
     {
-        $actor = $this->resolveActor($actor);
+        $actor = $this->actors->resolve($actor);
         $this->authorization->authorize($actor, SettingAbility::Reset, $key);
         if ($expectedRevision < 1) {
             throw new InvalidArgumentException('Expected revision must be positive.');
@@ -244,7 +247,9 @@ final readonly class SettingWriter
             $setting->has_override = false;
             $setting->valid_from = null;
             $setting->valid_until = null;
-            $setting->save();
+            if (! $setting->save()) {
+                throw SettingWriteRejectedException::forKey($key);
+            }
             $setting->refresh();
             $this->cache->flushAfterCommit();
             $this->publishChange($setting, 'reset', $actor, $connection);
@@ -471,7 +476,9 @@ final readonly class SettingWriter
 
         if ($prune === SettingPruneStrategy::Delete) {
             foreach ($orphaned as $setting) {
-                $setting->delete();
+                if ($setting->delete() !== true) {
+                    throw SettingWriteRejectedException::forKey($setting->fullKey());
+                }
             }
 
             return;
@@ -482,42 +489,14 @@ final readonly class SettingWriter
                 continue;
             }
 
-            $setting->forceFill([
+            if (! $setting->forceFill([
                 'orphaned_at' => $now,
                 'revision' => $setting->revision + 1,
                 'updated_at' => $now,
-            ])->save();
+            ])->save()) {
+                throw SettingWriteRejectedException::forKey($setting->fullKey());
+            }
         }
-    }
-
-    private function resolveActor(Authenticatable|SystemActor $actor): Authenticatable|SystemActor
-    {
-        if ($actor instanceof SystemActor) {
-            return $actor;
-        }
-        $id = $actor->getAuthIdentifier();
-        if ((! is_string($id) && ! is_int($id)) || $id === ''
-            || ($actor instanceof Model && (! $actor->exists || $actor->isDirty($actor->getAuthIdentifierName())))) {
-            throw new AuthorizationException('Settings mutations require a persisted actor.');
-        }
-
-        if (! $actor instanceof Model) {
-            return $actor;
-        }
-        $canonical = new ($actor::class);
-        $defaultConnection = $this->database->getDefaultConnection();
-        if ($canonical->getTable() !== $actor->getTable()
-            || $canonical->getKeyName() !== $actor->getKeyName()
-            || ($canonical->getConnectionName() ?? $defaultConnection) !== ($actor->getConnectionName() ?? $defaultConnection)
-            || $actor->getRawOriginal($actor->getKeyName()) !== $actor->getKey()) {
-            throw new AuthorizationException('Settings actor storage cannot be substituted.');
-        }
-        $persisted = $canonical->newQuery()->whereKey($actor->getKey())->first();
-        if (! $persisted instanceof Authenticatable || $persisted->getAuthIdentifier() !== $id) {
-            throw new AuthorizationException('Settings mutations require a persisted actor.');
-        }
-
-        return $persisted;
     }
 
     private function assertOverrideAllowed(Definition $definition): void

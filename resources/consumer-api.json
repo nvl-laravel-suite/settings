@@ -192,6 +192,22 @@
             "properties": [],
             "constants": []
         },
+        "Nvl\\Settings\\Exceptions\\SettingWriteRejectedException": {
+            "kind": "class",
+            "file": "src/Exceptions/SettingWriteRejectedException.php",
+            "methods": [
+                "forKey",
+                "package",
+                "publicContext",
+                "responseCode",
+                "responseHeaders",
+                "suggestedStatus",
+                "translationKey",
+                "translationParameters"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Settings\\Exceptions\\StaleSettingVersionException": {
             "kind": "class",
             "file": "src/Exceptions/StaleSettingVersionException.php",
