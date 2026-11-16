@@ -30,6 +30,77 @@ use Nvl\Support\Enums\SystemActor;
 
 uses(InteractsWithSettings::class);
 
+it('adopts scoped JSON values with original IDs and reports explicitly retained orphans', function (): void {
+    $this->defineSettings([
+        'legacy.catalog.label' => ['type' => SettingType::Text, 'default' => 'Default'],
+        'legacy.checkout.flag' => ['type' => SettingType::Boolean, 'default' => true],
+        'legacy.checkout.nullable' => ['type' => SettingType::Text, 'default' => 'Default', 'rules' => ['nullable']],
+        'legacy.catalog.options' => ['type' => SettingType::Json, 'default' => []],
+    ]);
+    Schema::create('legacy_scoped_settings', function (Blueprint $table): void {
+        $table->uuid('id')->primary();
+        $table->string('scope');
+        $table->string('key');
+        $table->json('value')->nullable();
+        $table->timestamps();
+        $table->unique(['scope', 'key']);
+    });
+    $time = '2026-04-20 10:11:12';
+    $values = [
+        ['catalog', 'shared', '"false"'], ['checkout', 'shared', 'false'],
+        ['checkout', 'nullable', 'null'], ['catalog', 'options', '{"enabled":true}'],
+        ['catalog', 'orphan', '0'],
+    ];
+    $records = array_map(static fn (array $row): array => [
+        'id' => (string) Str::uuid(), 'scope' => $row[0], 'key' => $row[1],
+        'value' => $row[2], 'created_at' => $time, 'updated_at' => $time,
+    ], $values);
+    DB::table('legacy_scoped_settings')->insert($records);
+    $manifest = [
+        'version' => 1, 'source_table' => 'legacy_scoped_settings', 'scope_column' => 'scope',
+        'value_encoding' => 'json', 'orphan_policy' => 'report', 'preserve_identity' => true, 'expected_count' => 5,
+        'key_replacements' => [
+            'catalog' => ['shared' => 'legacy.catalog.label', 'options' => 'legacy.catalog.options'],
+            'checkout' => ['shared' => 'legacy.checkout.flag', 'nullable' => 'legacy.checkout.nullable'],
+        ],
+        'expected_revisions' => [
+            'legacy.catalog.label' => 0, 'legacy.catalog.options' => 0,
+            'legacy.checkout.flag' => 0, 'legacy.checkout.nullable' => 0,
+        ],
+    ];
+    $adopter = app(SettingsAdopter::class);
+    $plan = $adopter->execute($manifest);
+    expect($plan['orphans'])->toBe([['scope' => 'catalog', 'key' => 'orphan']])
+        ->and($plan['schema_fingerprint'])->toMatch('/^[a-f0-9]{64}$/')
+        ->and(fn () => $adopter->execute($manifest, apply: true, actor: settingsTestActor()))->toThrow(InvalidArgumentException::class, 'fingerprint');
+    $manifest['fingerprint'] = $plan['fingerprint'];
+
+    $interrupted = false;
+    DB::connection()->beforeExecuting(static function (string $sql, array $bindings) use (&$interrupted, $records): void {
+        if (! $interrupted && str_starts_with($sql, 'insert') && in_array($records[2]['id'], $bindings, true)) {
+            $interrupted = true;
+            throw new RuntimeException('simulated interruption');
+        }
+    });
+    expect(fn () => $adopter->execute($manifest, apply: true, actor: settingsTestActor()))->toThrow(RuntimeException::class, 'simulated interruption')
+        ->and(Setting::query()->count())->toBe(0);
+
+    expect($adopter->execute($manifest, apply: true, actor: settingsTestActor())['reconciliation']['matched'])->toBe(4)
+        ->and($adopter->execute($manifest, apply: true, actor: settingsTestActor())['reconciliation']['unchanged'])->toBe(4)
+        ->and($adopter->verify($manifest)['reconciliation']['matched'])->toBe(4);
+    $reader = app(SettingRepository::class);
+    expect($reader->get('legacy.catalog.label'))->toBe('false')
+        ->and($reader->get('legacy.checkout.flag'))->toBeFalse()
+        ->and($reader->get('legacy.checkout.nullable'))->toBeNull()
+        ->and($reader->get('legacy.catalog.options'))->toBe(['enabled' => true])
+        ->and(Setting::query()->findOrFail($records[0]['id'])->updated_at?->format('Y-m-d H:i:s'))->toBe($time);
+
+    DB::table('legacy_scoped_settings')->where('id', $records[0]['id'])->update(['value' => '"changed"']);
+    expect(fn () => $adopter->verify($manifest))->toThrow(InvalidArgumentException::class, 'fingerprint');
+    Schema::table('legacy_scoped_settings', static fn (Blueprint $table) => $table->dropColumn('value'));
+    expect(fn () => $adopter->verify($manifest))->toThrow(InvalidArgumentException::class, 'incompatible schema');
+});
+
 it('bounds source reads when a staged import exceeds its declared row count', function (): void {
     $this->defineSettings(['core.enabled' => ['type' => SettingType::Boolean, 'default' => false]]);
     Schema::create('oversized_settings', function (Blueprint $table): void {

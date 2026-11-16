@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Support\DefinitionRepository;
+use Nvl\Settings\Support\SettingKey;
 use Throwable;
 
 /**
@@ -178,8 +179,9 @@ final readonly class SettingsDoctor
         $query = $connection->table($table);
         // Patterns keep the reserved `key` column and a prefixed table out of raw SQL.
         $longer = str_repeat('_', DefinitionRepository::MAX_SEGMENT_LENGTH + 1).'%';
+        $leafLonger = str_repeat('_', DefinitionRepository::MAX_LEAF_LENGTH + 1).'%';
         $invalidRowsExist = (clone $query)
-            ->where(static function (Builder $query) use ($longer): void {
+            ->where(static function (Builder $query) use ($longer, $leafLonger): void {
                 $query
                     ->whereNull('namespace')
                     ->orWhere('namespace', '')
@@ -187,7 +189,7 @@ final readonly class SettingsDoctor
                     ->orWhere('key', '')
                     ->orWhere('namespace', 'like', $longer)
                     ->orWhere('scope', 'like', $longer)
-                    ->orWhere('key', 'like', $longer)
+                    ->orWhere('key', 'like', $leafLonger)
                     ->orWhere('revision', '<', 1)
                     ->orWhereNull('definition_hash')
                     ->orWhereRaw('LENGTH(definition_hash) <> ?', [64])
@@ -245,9 +247,9 @@ final readonly class SettingsDoctor
                 if (! is_string($namespace)
                     || ! is_string($scope)
                     || ! is_string($key)
-                    || preg_match('/^[A-Za-z0-9_-]+$/', $namespace) !== 1
-                    || ($scope !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $scope) !== 1)
-                    || preg_match('/^[A-Za-z0-9_-]+$/', $key) !== 1) {
+                    || ! SettingKey::segment($namespace)
+                    || ($scope !== '' && ! SettingKey::segment($scope))
+                    || ! SettingKey::leaf($key)) {
                     $invalidIdentifier = true;
                 }
                 if (! is_string($typeValue)) {

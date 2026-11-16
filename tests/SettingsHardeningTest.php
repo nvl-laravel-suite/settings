@@ -14,6 +14,7 @@ use Nvl\Settings\Services\PlatformSettingsReader;
 use Nvl\Settings\Services\PlatformSettingsRuntime;
 use Nvl\Settings\Services\SettingReader;
 use Nvl\Settings\Services\SettingsDoctor;
+use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
 use Nvl\Settings\Tests\TestCase;
 
@@ -145,7 +146,7 @@ it('diagnoses a settings table on a prefixed connection', function (): void {
             $connection->table('prefixed_settings')->insert([
                 'id' => '00000000-0000-0000-0000-000000000001',
                 'namespace' => 'catalog',
-                'key' => str_repeat('k', 101),
+                'key' => str_repeat('k', DefinitionRepository::MAX_LEAF_LENGTH + 1),
                 'type' => SettingType::Text->value,
                 'definition_hash' => str_repeat('a', 64),
             ]);

@@ -33,6 +33,12 @@ $record = app(SettingReader::class)->get('site.title');
 
 `SettingRepository` and the `Setting` facade are read only runtime access (`get`, `has`). `SettingReader::get` returns the typed `value`, `source` (`definition` or `database`), `type`, `revision`, definition hash, override/orphan flags and validity window. A persisted row's type, value and hash remain together until successful definition reconciliation. A definition default is returned in the same runtime type as a stored fallback, so a decimal default of `0.2` reads as `'0.2'` and a date string as a date object. `getMany` accepts a list of at most 500 keys and returns these records in input order with one scoped data query. `paginate` accepts only `namespace`, `scope`, `search`, `page`, and `per_page`; each item has a `definition` and `value` record. Consumers own their HTTP routes, DTOs and Actions.
 
+Namespaces and scopes remain explicit single segments. A leaf may be dotted, such as `invites.reminder.enabled` inside the `bookings` namespace and `reviews` scope. Each segment permits 100 characters and the complete leaf permits 255. Two definitions that produce the same full key fail discovery. Test fakes can supply `scope: ''` for a dotted leaf without a scope.
+
+Use `EffectiveValueResolver::get($key, $default)` to read active overrides, then a definition's `config_key` or the requested config path, then the caller's default. Explicit null, false and zero are values at each step. Pass `SettingFallbackPolicy::DefinitionDefault` to use the definition default when its config path is absent. The resolver also supports config-only paths.
+
+`PresentationCatalog::scopes()` and `fields('bookings.reviews')` expose deterministic scope and field ordering. Define optional field `group`, `label` and `hint` under `metadata`, with `position` controlling order. Supply `ScopeDefinition` entries to customize scope labels, hints and sort order. Applications own translation and routing.
+
 ## Management writes
 
 ```php
@@ -64,6 +70,10 @@ Values, fallbacks and cache payloads are plaintext. Keep credentials and secrets
 `SettingCache` uses the configured key as a prefix, isolating entries by model, database source, table, ownership and definition hashes in both owned and unowned installations. Single-value runtime reads fetch and hydrate only the requested record. Cache entries include a partition generation captured before the database read; committed invalidation changes the generation so an in-flight stale fill cannot be reused. `nvl-settings.cache.ttl` defaults to 300 seconds and bounds the lifetime of obsolete generations. A transaction on the Settings connection reads its own writes without shared cache. Cache invalidation occurs after the real outer commit. `nvl:settings:cache` rebuilds discovery, while `nvl:settings:clear` clears its cache.
 
 `nvl:settings:adopt <manifest>` plans an import from a staged legacy table; `--apply` requires a host `SettingsAuthorization` binding for `SystemActor::Background`. A version 1 manifest names `source_table`, `expected_count`, explicit `key_replacements`, and `expected_revisions` for every mapped target. Use revision `0` for absent targets and the exact current revision for existing rows. Apply uses `SettingWriter::set` for each target inside one target connection transaction, then reconciles all targets before commit. A stale revision or mismatch rolls back the whole import. The plan returns counts, never setting values. This is a staged import workflow, not automatic legacy schema conversion.
+
+For a legacy `(scope, key)` table, set `scope_column` and group `key_replacements` as `{"source_scope":{"source_key":"target.full.key"}}`. Set `value_encoding: "json"` for JSON values or use the default `"target_codec"`. `preserve_identity: true` requires source UUIDs and preserves `created_at` and `updated_at` at whole-second UTC precision. Use `valid_from_column` to carry a legacy validity start. An `orphan_policy` of `"report"` includes each unmapped source identity and leaves its legacy row in place. Set `expected_count` to the total source count including reported orphans.
+
+Freeze legacy writes while staging. For extended manifests, copy the plan's `fingerprint` into the reviewed manifest before `--apply`. A preserved target row that matches its source can be reused after retrying. Run `--verify` with the reviewed fingerprint before switching application reads. The schema, source rows and target definitions contribute to the fingerprint.
 
 Source reads stop after the declared count plus one sentinel row, rejecting oversized staging tables without loading all their values into application memory.
 

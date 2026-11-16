@@ -8,12 +8,32 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Nvl\Settings\Contracts\SettingRepository;
 use Nvl\Settings\Enums\SettingType;
+use Nvl\Settings\Exceptions\DuplicateSettingException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Services\SettingCache;
+use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
 use Nvl\Settings\Tests\SettingsCacheTestCase;
 
 uses(InteractsWithSettings::class);
+
+it('caches committed dotted leaves and rejects moving a stored key across its scope boundary', function (): void {
+    $key = 'bookings.reviews.invites.enabled';
+    $definition = ['type' => SettingType::Boolean, 'default' => false];
+    $this->defineSettings([$key => $definition]);
+    settingsSetForTest($key, true);
+
+    $reader = app(SettingRepository::class);
+    expect($reader->get($key))->toBeTrue();
+    $cached = app(SettingCache::class)->recordIdentity($key);
+    expect(Cache::store($cached->store)->get($cached->key)[0]['key'])->toBe('invites.enabled');
+
+    $this->defineSettings([$key => [...$definition, 'scope' => '']]);
+    expect(fn () => settingsSetForTest($key, false))->toThrow(DuplicateSettingException::class, 'different scope')
+        ->and(fn () => app(SettingWriter::class)->sync(dryRun: true))->toThrow(DuplicateSettingException::class, 'different scope')
+        ->and(fn () => app(SettingWriter::class)->sync())->toThrow(DuplicateSettingException::class, 'different scope')
+        ->and(Setting::query()->count())->toBe(1);
+});
 
 it('caches only primitive setting payloads on serialized stores', function (): void {
     /** @var SettingsCacheTestCase $this */

@@ -37,6 +37,7 @@ final readonly class Definition
         public bool $tenantOverride,
         public array $metadata,
         public string $source,
+        public ?string $configKey = null,
     ) {}
 
     /**
@@ -60,15 +61,12 @@ final readonly class Definition
                 'overrides' => $this->overrides,
                 'tenant_override' => $this->tenantOverride,
                 'metadata' => $this->metadata,
+                ...($this->configKey === null ? [] : ['config_key' => $this->configKey]),
             ], JSON_THROW_ON_ERROR);
         } catch (InvalidDefinitionException $exception) {
             throw $exception;
         } catch (Throwable $throwable) {
-            $fullKey = implode('.', array_filter([
-                $this->namespace,
-                $this->scope,
-                $this->key,
-            ]));
+            $fullKey = SettingKey::full($this->namespace, $this->scope, $this->key);
 
             throw new InvalidDefinitionException(
                 "Setting [{$fullKey}] cannot be hashed deterministically.",

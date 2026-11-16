@@ -24,7 +24,9 @@ Search for the relevant fully qualified service or contract and read only its ma
 - `Nvl\Settings\Models\Setting`
 - `Nvl\Settings\Rules\IntegerListBetween`
 - `Nvl\Settings\Rules\IntegerMapBetween`
+- `Nvl\Settings\Services\EffectiveValueResolver`
 - `Nvl\Settings\Services\PlatformSettingsRuntime`
+- `Nvl\Settings\Services\PresentationCatalog`
 - `Nvl\Settings\Services\SettingModelRegistry`
 - `Nvl\Settings\Services\SettingReader`
 - `Nvl\Settings\Services\SettingWriter`
@@ -33,6 +35,7 @@ Search for the relevant fully qualified service or contract and read only its ma
 - `Nvl\Settings\Services\SettingsSourceValidator`
 - `Nvl\Settings\Support\Definition`
 - `Nvl\Settings\Support\DefinitionRepository`
+- `Nvl\Settings\Support\ScopeDefinition`
 - `Nvl\Settings\Support\SettingAuditContext`
 - `Nvl\Settings\Support\SettingSubjectReference`
 - `Nvl\Settings\Support\SettingsRules`
@@ -328,6 +331,14 @@ public readonly int $maximum
 public readonly int $minimum
 ```
 
+## Nvl\Settings\Services\EffectiveValueResolver
+
+```text
+final readonly class Nvl\Settings\Services\EffectiveValueResolver
+public function __construct(Nvl\Settings\Support\DefinitionRepository $definitions, Nvl\Settings\Services\SettingCache $cache, Illuminate\Contracts\Config\Repository $config): mixed
+public function get(string $key, mixed $default=null, Nvl\Settings\Enums\SettingFallbackPolicy $policy=\Nvl\Settings\Enums\SettingFallbackPolicy::CallerDefault): mixed
+```
+
 ## Nvl\Settings\Services\PlatformSettingsRuntime
 
 ```text
@@ -342,6 +353,21 @@ public function run(Closure $operation): mixed
 @return T
 @throws Throwable
 template Nvl\Settings\Services\PlatformSettingsRuntime::T
+```
+
+## Nvl\Settings\Services\PresentationCatalog
+
+```text
+final readonly class Nvl\Settings\Services\PresentationCatalog
+public function __construct(Nvl\Settings\Support\DefinitionRepository $definitions, array $scopes=[]): mixed
+@param list<ScopeDefinition> $scopes
+resolved @param list<Nvl\Settings\Support\ScopeDefinition> $scopes
+public function fields(string $scope): array
+@return list<array{key: string, group: ?string, order: int, label: ?string, hint: ?string, definition: DefinitionRecord}>
+resolved @return list<array{key: string, group: ?string, order: int, label: ?string, hint: ?string, definition: array{key: string, namespace: string, scope: string, type: Nvl\Settings\Enums\SettingType, default: mixed, description: string, position: int, metadata: array<string, mixed>, definition_hash: string}}>
+public function scopes(): array
+@return list<ScopeDefinition>
+resolved @return list<Nvl\Settings\Support\ScopeDefinition>
 ```
 
 ## Nvl\Settings\Services\SettingModelRegistry
@@ -395,7 +421,12 @@ final readonly class Nvl\Settings\Services\SettingsAdopter
 public function __construct(Nvl\Settings\Services\SettingsAdoptionManifest $manifests, Nvl\Settings\Support\DefinitionRepository $definitions, Nvl\Settings\Services\SettingValueValidator $values, Nvl\Settings\Services\SettingWriter $writer, Nvl\Support\Ownership\Contracts\OwnershipBoundary $boundary): mixed
 public function execute(array $manifest, bool $apply=false, Illuminate\Contracts\Auth\Authenticatable|Nvl\Support\Enums\SystemActor|null $actor=null): array
 @param array<array-key, mixed> $manifest
-@return array{mode: string, source_table: string, reconciliation: array{expected: int, source: int, mapped: int, matched: int, created: int, updated: int, unchanged: int}}
+@return AdoptionResult
+resolved @return array{mode: string, source_table: string, schema_fingerprint: string, fingerprint: string, orphans: list<array{scope: ?string, key: string}>, conflicts: list<string>, reconciliation: array{expected: int, source: int, mapped: int, matched: int, created: int, updated: int, unchanged: int}}
+public function verify(array $manifest): array
+@param array<array-key, mixed> $manifest
+@return AdoptionResult
+resolved @return array{mode: string, source_table: string, schema_fingerprint: string, fingerprint: string, orphans: list<array{scope: ?string, key: string}>, conflicts: list<string>, reconciliation: array{expected: int, source: int, mapped: int, matched: int, created: int, updated: int, unchanged: int}}
 ```
 
 ## Nvl\Settings\Services\SettingsDoctor
@@ -422,10 +453,11 @@ public function inspect(): array
 ```text
 final readonly class Nvl\Settings\Support\Definition
 @param array<int, mixed> $rules
-public function __construct(string $namespace, string $scope, string $key, Nvl\Settings\Enums\SettingType $type, mixed $default, string $description, array $rules, int $position, ?string $overrides, bool $tenantOverride, array $metadata, string $source): mixed
+public function __construct(string $namespace, string $scope, string $key, Nvl\Settings\Enums\SettingType $type, mixed $default, string $description, array $rules, int $position, ?string $overrides, bool $tenantOverride, array $metadata, string $source, ?string $configKey=null): mixed
 @param array<int, mixed> $rules
 @param array<string, mixed> $metadata
 public function hash(): string
+public readonly ?string $configKey
 public readonly mixed $default
 public readonly string $description
 public readonly string $key
@@ -446,7 +478,8 @@ public readonly Nvl\Settings\Enums\SettingType $type
 
 ```text
 final class Nvl\Settings\Support\DefinitionRepository
-public const int MAX_FULL_KEY_LENGTH=302
+public const int MAX_FULL_KEY_LENGTH=2 * self::MAX_SEGMENT_LENGTH + self::MAX_LEAF_LENGTH + 2
+public const int MAX_LEAF_LENGTH=255
 public const int MAX_SEGMENT_LENGTH=100
 public function __construct(Nvl\Settings\Support\DefinitionFileLoader $files, Illuminate\Contracts\Foundation\Application $application): mixed
 public function all(): array
@@ -456,13 +489,26 @@ public function cachePath(): string
 public function checksum(?array $map=null): string
 @param (array<string, string> | null) $map
 public function fake(array $definitions): void
-@param array<string, array{type: SettingType, default?: mixed, description?: string, rules?: array<int, mixed>, position?: int, overrides?: (string | null), tenant_override?: bool, metadata?: array<string, mixed>}> $definitions
-resolved @param array<string, array{type: Nvl\Settings\Enums\SettingType, default?: mixed, description?: string, rules?: array<int, mixed>, position?: int, overrides?: (string | null), tenant_override?: bool, metadata?: array<string, mixed>}> $definitions
+@param array<string, array{type: SettingType, default?: mixed, scope?: string, description?: string, rules?: array<int, mixed>, position?: int, overrides?: (string | null), tenant_override?: bool, metadata?: array<string, mixed>, config_key?: (string | null)}> $definitions
+resolved @param array<string, array{type: Nvl\Settings\Enums\SettingType, default?: mixed, scope?: string, description?: string, rules?: array<int, mixed>, position?: int, overrides?: (string | null), tenant_override?: bool, metadata?: array<string, mixed>, config_key?: (string | null)}> $definitions
 public function get(string $fullKey): Nvl\Settings\Support\Definition
 public function map(): array
 @return array<string, string>
 public function refresh(): array
 @return array<string, string>
+```
+
+## Nvl\Settings\Support\ScopeDefinition
+
+```text
+final readonly class Nvl\Settings\Support\ScopeDefinition
+public function __construct(string $namespace, string $scope="", ?string $label=null, ?string $hint=null, int $order=0): mixed
+public function key(): string
+public readonly ?string $hint
+public readonly ?string $label
+public readonly string $namespace
+public readonly int $order
+public readonly string $scope
 ```
 
 ## Nvl\Settings\Support\SettingAuditContext

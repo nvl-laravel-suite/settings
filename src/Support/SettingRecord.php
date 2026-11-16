@@ -54,10 +54,7 @@ final class SettingRecord
 
     private static function key(Definition $definition): string
     {
-        return implode('.', array_filter(
-            [$definition->namespace, $definition->scope, $definition->key],
-            static fn (string $segment): bool => $segment !== '',
-        ));
+        return SettingKey::full($definition->namespace, $definition->scope, $definition->key);
     }
 
     /** @return 'database'|'definition' */

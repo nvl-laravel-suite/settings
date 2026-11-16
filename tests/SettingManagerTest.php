@@ -12,13 +12,17 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Nvl\Settings\Contracts\SettingRepository;
+use Nvl\Settings\Enums\SettingFallbackPolicy;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Events\SettingChanged;
+use Nvl\Settings\Exceptions\DuplicateSettingException;
 use Nvl\Settings\Exceptions\InvalidDefinitionException;
 use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Providers\SettingsServiceProvider;
 use Nvl\Settings\Services\ConfigOverrideApplier;
+use Nvl\Settings\Services\EffectiveValueResolver;
+use Nvl\Settings\Services\PresentationCatalog;
 use Nvl\Settings\Services\SettingReader;
 use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Services\SettingWriter;
@@ -79,6 +83,57 @@ it('resolves defaults from fake definition', function (): void {
     $repo = app(SettingRepository::class);
 
     expect($repo->get('products.pricing.tax_inclusive'))->toBeFalse();
+});
+
+it('discovers caches and persists dotted leaves with explicit scope and rejects ambiguous identities', function (): void {
+    $directory = sys_get_temp_dir().'/nvl-settings-'.Str::uuid();
+    $files = app(Filesystem::class);
+    $files->ensureDirectoryExists($directory);
+    $path = "{$directory}/bookings.settings.json";
+    $leaf = 'invites.'.str_repeat('x', 99).'.enabled';
+    $source = ['scopes' => ['reviews' => [$leaf => ['type' => 'bool', 'default' => false, 'metadata' => ['group' => 'invites', 'label' => 'Invites', 'hint' => 'Send a reminder']]]]];
+    $files->put($path, json_encode($source, JSON_THROW_ON_ERROR));
+    config()->set(['nvl-settings.discovery.paths' => [$directory], 'nvl-settings.discovery.cache' => true, 'nvl-settings.cache.enabled' => true]);
+    $repository = app(DefinitionRepository::class);
+    $key = "bookings.reviews.{$leaf}";
+
+    try {
+        $repository->refresh();
+        expect($repository->get($key)->scope)->toBe('reviews')
+            ->and($repository->get($key)->key)->toBe($leaf)
+            ->and(app(SettingRepository::class)->get($key))->toBeFalse()
+            ->and(settingsSetForTest($key, true)['value'])->toBeTrue()
+            ->and(app(SettingRepository::class)->get($key))->toBeTrue()
+            ->and(app(PresentationCatalog::class)->scopes()[0]->key())->toBe('bookings.reviews')
+            ->and(app(PresentationCatalog::class)->fields('bookings.reviews')[0])->toMatchArray(['group' => 'invites', 'label' => 'Invites', 'hint' => 'Send a reminder']);
+
+        $source['settings']['reviews.'.$leaf] = ['type' => 'bool', 'default' => false];
+        $files->put($path, json_encode($source, JSON_THROW_ON_ERROR));
+        expect(fn () => $repository->refresh())->toThrow(DuplicateSettingException::class);
+    } finally {
+        $files->deleteDirectory($directory);
+    }
+});
+
+it('resolves mapped and config-only settings while retaining literal null false and zero', function (): void {
+    $this->defineSettings([
+        'views.invites.enabled' => ['type' => SettingType::Boolean, 'default' => true, 'config_key' => 'test-settings.flag'],
+        'views.invites.limit' => ['type' => SettingType::Integer, 'default' => 12, 'config_key' => 'test-settings.limit', 'rules' => ['nullable']],
+        'views.invites.missing' => ['type' => SettingType::Text, 'default' => 'definition', 'config_key' => 'test-settings.absent'],
+    ]);
+    config()->set(['test-settings.flag' => false, 'test-settings.limit' => 0, 'test-settings.special' => null]);
+    $resolver = app(EffectiveValueResolver::class);
+
+    expect($resolver->get('views.invites.enabled', true))->toBeFalse()
+        ->and($resolver->get('views.invites.limit', 40))->toBe(0)
+        ->and($resolver->get('test-settings.special', 'default'))->toBeNull()
+        ->and($resolver->get('views.invites.missing', 'caller'))->toBe('caller')
+        ->and($resolver->get('views.invites.missing', 'caller', SettingFallbackPolicy::DefinitionDefault))->toBe('definition')
+        ->and($resolver->get('test-settings.unknown', 'caller'))->toBe('caller');
+    settingsSetForTest('views.invites.enabled', true);
+    settingsSetForTest('views.invites.limit', null);
+    expect($resolver->get('views.invites.enabled', false))->toBeTrue()
+        ->and($resolver->get('views.invites.limit', 40))->toBeNull();
 });
 
 it('discovers and validates equivalent PHP and JSON definition sources', function (): void {

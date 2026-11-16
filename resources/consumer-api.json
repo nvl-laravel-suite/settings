@@ -304,6 +304,16 @@
             ],
             "constants": []
         },
+        "Nvl\\Settings\\Services\\EffectiveValueResolver": {
+            "kind": "class",
+            "file": "src/Services/EffectiveValueResolver.php",
+            "methods": [
+                "__construct",
+                "get"
+            ],
+            "properties": [],
+            "constants": []
+        },
         "Nvl\\Settings\\Services\\PlatformSettingsRuntime": {
             "kind": "class",
             "file": "src/Services/PlatformSettingsRuntime.php",
@@ -312,6 +322,17 @@
                 "apply",
                 "restore",
                 "run"
+            ],
+            "properties": [],
+            "constants": []
+        },
+        "Nvl\\Settings\\Services\\PresentationCatalog": {
+            "kind": "class",
+            "file": "src/Services/PresentationCatalog.php",
+            "methods": [
+                "__construct",
+                "fields",
+                "scopes"
             ],
             "properties": [],
             "constants": []
@@ -355,7 +376,8 @@
             "file": "src/Services/SettingsAdopter.php",
             "methods": [
                 "__construct",
-                "execute"
+                "execute",
+                "verify"
             ],
             "properties": [],
             "constants": []
@@ -388,6 +410,7 @@
                 "hash"
             ],
             "properties": [
+                "configKey",
                 "default",
                 "description",
                 "key",
@@ -419,8 +442,25 @@
             "properties": [],
             "constants": [
                 "MAX_FULL_KEY_LENGTH",
+                "MAX_LEAF_LENGTH",
                 "MAX_SEGMENT_LENGTH"
             ]
+        },
+        "Nvl\\Settings\\Support\\ScopeDefinition": {
+            "kind": "class",
+            "file": "src/Support/ScopeDefinition.php",
+            "methods": [
+                "__construct",
+                "key"
+            ],
+            "properties": [
+                "hint",
+                "label",
+                "namespace",
+                "order",
+                "scope"
+            ],
+            "constants": []
         },
         "Nvl\\Settings\\Support\\SettingAuditContext": {
             "kind": "class",

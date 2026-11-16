@@ -7,7 +7,6 @@ namespace Nvl\Settings\Support;
 use BadMethodCallException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use InvalidArgumentException;
 use JsonException;
 use Nvl\Settings\Enums\SettingType;
@@ -26,7 +25,9 @@ final class DefinitionRepository
 {
     public const int MAX_SEGMENT_LENGTH = 100;
 
-    public const int MAX_FULL_KEY_LENGTH = 302;
+    public const int MAX_LEAF_LENGTH = 255;
+
+    public const int MAX_FULL_KEY_LENGTH = 2 * self::MAX_SEGMENT_LENGTH + self::MAX_LEAF_LENGTH + 2;
 
     /** @var array<string, Definition>|null  keyed by "namespace.scope.key" */
     protected ?array $definitions = null;
@@ -180,14 +181,11 @@ final class DefinitionRepository
                 }
 
                 foreach ($keys as $key => $config) {
-                    if (! is_string($key) || ! $this->validSegment($key) || ! is_array($config)) {
+                    if (! is_string($key) || ! SettingKey::leaf($key) || ! is_array($config)) {
                         throw new InvalidDefinitionException("Settings namespace [{$namespace}] contains an invalid key definition.");
                     }
 
-                    $fullKey = implode('.', array_filter(
-                        [$namespace, $scope, $key],
-                        static fn (string $segment): bool => $segment !== '',
-                    ));
+                    $fullKey = SettingKey::full($namespace, $scope, $key);
 
                     if (isset($definitions[$fullKey])) {
                         throw new DuplicateSettingException("Setting [$fullKey] is duplicated.");
@@ -197,7 +195,7 @@ final class DefinitionRepository
                         array_keys($config),
                         [
                             'type', 'default', 'description', 'rules',
-                            'position', 'overrides', 'tenant_override', 'metadata',
+                            'position', 'overrides', 'tenant_override', 'metadata', 'config_key',
                         ],
                     );
 
@@ -301,6 +299,7 @@ final class DefinitionRepository
                         tenantOverride: $tenantOverride,
                         metadata: $metadata,
                         source: $file,
+                        configKey: $this->configKey($fullKey, $config['config_key'] ?? null),
                     );
                     $definition->hash();
                     $definitions[$fullKey] = $definition;
@@ -478,23 +477,23 @@ final class DefinitionRepository
     /**
      * Replace discovered definitions for a test.
      *
-     * @param  array<string, array{type: SettingType, default?: mixed, description?: string, rules?: array<int, mixed>, position?: int, overrides?: string|null, tenant_override?: bool, metadata?: array<string, mixed>}>  $definitions
+     * @param  array<string, array{type: SettingType, default?: mixed, scope?: string, description?: string, rules?: array<int, mixed>, position?: int, overrides?: string|null, tenant_override?: bool, metadata?: array<string, mixed>, config_key?: string|null}>  $definitions
      */
     public function fake(array $definitions): void
     {
-        $this->faked = true;
-        $this->definitions = [];
+        $prepared = [];
 
         foreach ($definitions as $fullKey => $config) {
             $parts = explode('.', $fullKey);
             $namespace = $parts[0];
-            $scope = count($parts) === 3 ? $parts[1] : '';
-            $key = $parts[count($parts) - 1];
+            $scope = $config['scope'] ?? (count($parts) > 2 ? $parts[1] : '');
+            $prefix = $scope === '' ? $namespace.'.' : $namespace.'.'.$scope.'.';
+            $key = substr($fullKey, strlen($prefix));
 
-            if (! in_array(count($parts), [2, 3], true)
-                || ! $this->validSegment($namespace)
+            if (! $this->validSegment($namespace)
                 || ($scope !== '' && ! $this->validSegment($scope))
-                || ! $this->validSegment($key)) {
+                || ! str_starts_with($fullKey, $prefix)
+                || ! SettingKey::leaf($key)) {
                 throw new InvalidDefinitionException(
                     "Fake setting [{$fullKey}] must contain valid namespace, optional scope, and key segments.",
                 );
@@ -521,10 +520,13 @@ final class DefinitionRepository
                 tenantOverride: $config['tenant_override'] ?? false,
                 metadata: is_array($config['metadata'] ?? null) ? $config['metadata'] : [],
                 source: 'fake',
+                configKey: $this->configKey($fullKey, $config['config_key'] ?? null),
             );
             $definition->hash();
-            $this->definitions[$fullKey] = $definition;
+            $prepared[$fullKey] = $definition;
         }
+        $this->faked = true;
+        $this->definitions = $prepared;
     }
 
     /**
@@ -532,8 +534,16 @@ final class DefinitionRepository
      */
     private function validSegment(string $segment): bool
     {
-        return Str::length($segment) <= self::MAX_SEGMENT_LENGTH
-            && preg_match('/^[A-Za-z0-9_-]+$/', $segment) === 1;
+        return SettingKey::segment($segment);
+    }
+
+    private function configKey(string $fullKey, mixed $key): ?string
+    {
+        if ($key !== null && (! is_string($key) || ! SettingKey::leaf($key))) {
+            throw new InvalidDefinitionException("Setting [{$fullKey}] declares an invalid config_key.");
+        }
+
+        return $key;
     }
 
     /**

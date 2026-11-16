@@ -23,6 +23,7 @@ use Nvl\Settings\Enums\SettingAbility;
 use Nvl\Settings\Enums\SettingPruneStrategy;
 use Nvl\Settings\Enums\SettingType;
 use Nvl\Settings\Events\SettingChanged;
+use Nvl\Settings\Exceptions\DuplicateSettingException;
 use Nvl\Settings\Exceptions\StaleSettingVersionException;
 use Nvl\Settings\Models\Setting;
 use Nvl\Settings\Support\Definition;
@@ -77,6 +78,28 @@ final readonly class SettingWriter
         ?int $expectedRevision = null,
         array $options = [],
     ): array {
+        return $this->setValue($key, $value, $actor, $expectedRevision, $options);
+    }
+
+    /**
+     * Preserve a verified legacy source identity on the first write, or reuse its exact staged row.
+     *
+     * @internal
+     *
+     * @param  array{id:string,created_at:?string,updated_at:?string}  $source
+     */
+    public function stageLegacyOverride(string $key, mixed $value, Authenticatable|SystemActor $actor, int $expectedRevision, array $source, ?DateTimeInterface $validFrom): void
+    {
+        $this->setValue($key, $value, $actor, $expectedRevision, ['valid_from' => $validFrom], $source);
+    }
+
+    /**
+     * @param  array{valid_from?: DateTimeInterface|string|null, valid_until?: DateTimeInterface|string|null}  $options
+     * @param  array{id:string,created_at:?string,updated_at:?string}|null  $source
+     * @return Resolved
+     */
+    private function setValue(string $key, mixed $value, Authenticatable|SystemActor $actor, ?int $expectedRevision, array $options, ?array $source = null): array
+    {
         $actor = $this->resolveActor($actor);
         $this->authorization->authorize($actor, SettingAbility::Set, $key);
         if (array_diff(array_keys($options), ['valid_from', 'valid_until']) !== []) {
@@ -98,7 +121,7 @@ final readonly class SettingWriter
 
         $connection = $this->database->connection((SettingModelRegistry::newInstance())->getConnectionName());
         $setting = $connection->transaction(function () use (
-            $actor, $connection, $definition, $expectedRevision, $key, $options, $providedFrom, $providedUntil, $value,
+            $actor, $connection, $definition, $expectedRevision, $key, $options, $providedFrom, $providedUntil, $value, $source,
         ): Setting {
             $setting = $this->identityQuery($definition)->lockForUpdate()->first();
             $created = false;
@@ -110,13 +133,30 @@ final readonly class SettingWriter
             }
             $this->validateWindow($validFrom, $validUntil);
 
+            if ($source !== null && $setting instanceof Setting) {
+                if (($expectedRevision !== 0 && $expectedRevision !== $setting->revision)
+                    || $setting->getKey() !== $source['id']
+                    || $setting->getRawOriginal('created_at') !== $source['created_at']
+                    || $setting->getRawOriginal('updated_at') !== $source['updated_at']
+                    || ! $setting->has_override
+                    || $setting->definition_hash !== $definition->hash()
+                    || $definition->type->serialize($setting->value) !== $definition->type->serialize($value)
+                    || $setting->valid_from?->format('Y-m-d H:i:s') !== $validFrom?->format('Y-m-d H:i:s')
+                    || $setting->valid_until !== null) {
+                    throw StaleSettingVersionException::forKey($key);
+                }
+
+                return $setting;
+            }
+
             if (! $setting instanceof Setting) {
                 if ($expectedRevision !== null && $expectedRevision !== 0) {
                     throw StaleSettingVersionException::forKey($key);
                 }
+                $this->assertUnambiguousIdentity($definition, $key);
                 $now = now();
                 $inserted = $this->creator->insert([
-                    'id' => (string) Str::uuid(),
+                    'id' => $source['id'] ?? (string) Str::uuid(),
                     ...$this->boundary->attributes('settings.values'),
                     'namespace' => $definition->namespace,
                     'scope' => $definition->scope,
@@ -132,9 +172,12 @@ final readonly class SettingWriter
                     'valid_until' => $validUntil?->format('Y-m-d H:i:s'),
                     'synced_at' => $now,
                     'orphaned_at' => null,
-                    'created_at' => $now,
-                    'updated_at' => $now,
+                    'created_at' => $source === null ? $now : $source['created_at'],
+                    'updated_at' => $source === null ? $now : $source['updated_at'],
                 ]);
+                if ($inserted === 0 && $source !== null) {
+                    throw StaleSettingVersionException::forKey($key);
+                }
                 $setting = $this->identityQuery($definition)->lockForUpdate()->firstOrFail();
                 if ($inserted === 0 && $expectedRevision === 0) {
                     throw StaleSettingVersionException::forKey($key);
@@ -246,9 +289,7 @@ final readonly class SettingWriter
         ?string $provider,
         SettingPruneStrategy $prune,
     ): array {
-        $existing = $this->existingQuery($provider)
-            ->get()
-            ->keyBy(static fn (Setting $setting): string => $setting->fullKey());
+        $existing = $this->settingsByFullKey($this->existingQuery($provider)->get(), $definitions);
         $orphanCount = $prune === SettingPruneStrategy::Ignore
             ? 0
             : $existing->keys()->diff(array_keys($definitions))->count();
@@ -277,10 +318,7 @@ final readonly class SettingWriter
             $prune,
         ): array {
             $now = now();
-            $existing = $this->existingQuery($provider)
-                ->lockForUpdate()
-                ->get()
-                ->keyBy(static fn (Setting $setting): string => $setting->fullKey());
+            $existing = $this->settingsByFullKey($this->existingQuery($provider)->lockForUpdate()->get(), $definitions);
 
             foreach ($definitions as $fullKey => $definition) {
                 $setting = $existing->get($fullKey);
@@ -553,6 +591,37 @@ final readonly class SettingWriter
             'scope' => $definition->scope,
             'key' => $definition->key,
         ]);
+    }
+
+    private function assertUnambiguousIdentity(Definition $definition, string $key): void
+    {
+        $parts = $definition->scope === '' ? explode('.', $definition->key, 2) : ['', $definition->scope.'.'.$definition->key];
+        if (count($parts) === 2 && $this->boundary->query(SettingModelRegistry::query(), 'settings.values')->where([
+            'namespace' => $definition->namespace, 'scope' => $parts[0], 'key' => $parts[1],
+        ])->exists()) {
+            throw new DuplicateSettingException("Setting [{$key}] conflicts with a stored setting under a different scope.");
+        }
+    }
+
+    /**
+     * @param  Collection<int, Setting>  $rows
+     * @param  array<string,Definition>  $definitions
+     * @return Collection<string,Setting>
+     */
+    private function settingsByFullKey(Collection $rows, array $definitions): Collection
+    {
+        $existing = $rows->keyBy(static fn (Setting $setting): string => $setting->fullKey());
+        if ($rows->count() !== $existing->count()) {
+            throw new DuplicateSettingException('Multiple stored setting identities resolve to the same full key.');
+        }
+        foreach ($existing as $key => $setting) {
+            $definition = $definitions[$key] ?? null;
+            if ($definition !== null && ($setting->scope !== $definition->scope || $setting->key !== $definition->key)) {
+                throw new DuplicateSettingException("Setting [{$key}] conflicts with a stored setting under a different scope.");
+            }
+        }
+
+        return $existing;
     }
 
     /**
