@@ -7,6 +7,7 @@ use Illuminate\Auth\GenericUser;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
@@ -26,6 +27,8 @@ use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
 use Nvl\Settings\Tests\SettingsCacheTestCase;
+use Nvl\Support\Adoption\AdoptionProgress;
+use Nvl\Support\Adoption\AdoptionStore;
 use Nvl\Support\Enums\SystemActor;
 
 uses(InteractsWithSettings::class);
@@ -392,5 +395,126 @@ it('validates typed JSON lists and maps from portable source rules', function ()
             ->toThrow(ValidationException::class);
     } finally {
         $filesystem->deleteDirectory($directory);
+    }
+});
+
+/** @return array<string, mixed> */
+function settingsAdoptCommand(array $arguments): array
+{
+    $status = Artisan::call('nvl:adopt', ['package' => 'settings', ...$arguments, '--format' => 'json']);
+
+    return ['status' => $status, ...json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)];
+}
+
+it('resumes checkpointed nvl:adopt batches after a failure without duplicate revisions or events', function (): void {
+    /** @var SettingsCacheTestCase $this */
+    $this->artisan('migrate', ['--path' => __DIR__.'/../../core/support/database/migrations', '--realpath' => true])->assertSuccessful();
+    $this->defineSettings([
+        'core.first' => ['type' => SettingType::Boolean, 'default' => false],
+        'core.second' => ['type' => SettingType::Text, 'default' => 'none'],
+        'core.third' => ['type' => SettingType::Boolean, 'default' => true],
+    ]);
+    app()->instance(SettingsAuthorization::class, new class implements SettingsAuthorization
+    {
+        public function authorize(Authenticatable|SystemActor $actor, SettingAbility $ability, ?string $key = null): void
+        {
+            if ($actor !== SystemActor::Background) {
+                throw new AuthorizationException;
+            }
+        }
+    });
+    Schema::create('legacy_batched_settings', function (Blueprint $table): void {
+        $table->string('key')->primary();
+        $table->text('value');
+    });
+    DB::table('legacy_batched_settings')->insert([
+        ['key' => 'a.first', 'value' => '1'], ['key' => 'b.second', 'value' => 'staged'], ['key' => 'c.third', 'value' => '0'],
+    ]);
+    $filesystem = app(Filesystem::class);
+    $path = storage_path('framework/testing/settings-batched-adoption-'.Str::uuid().'.json');
+    $filesystem->ensureDirectoryExists(dirname($path));
+    $filesystem->put($path, json_encode([
+        'version' => 1, 'source_table' => 'legacy_batched_settings', 'expected_count' => 3,
+        'key_replacements' => ['a.first' => 'core.first', 'b.second' => 'core.second', 'c.third' => 'core.third'],
+        'expected_revisions' => ['core.first' => 0, 'core.second' => 0, 'core.third' => 0],
+    ], JSON_THROW_ON_ERROR));
+    Event::fake([SettingChanged::class]);
+
+    try {
+        $plan = settingsAdoptCommand(['phase' => 'plan', 'manifest' => $path]);
+        expect($plan['status'])->toBe(0)
+            ->and($plan['collisions'])->toBe([])
+            ->and($plan['counts']['overrides']['expected'])->toBe(3)
+            ->and(Setting::query()->count())->toBe(0);
+
+        $interrupted = false;
+        DB::connection()->beforeExecuting(static function (string $sql, array $bindings) use (&$interrupted): void {
+            if (! $interrupted && str_starts_with($sql, 'insert') && in_array('second', $bindings, true)) {
+                $interrupted = true;
+                throw new RuntimeException('simulated batch failure');
+            }
+        });
+        $failed = settingsAdoptCommand(['phase' => 'apply', 'manifest' => $path, '--fingerprint' => $plan['fingerprint'], '--batch-size' => 1]);
+        $run = (string) DB::table(AdoptionStore::Runs)->value('id');
+
+        expect($failed['status'])->toBe(1)
+            ->and($failed['error'])->toContain('simulated batch failure')
+            ->and(Setting::query()->pluck('key')->all())->toBe(['first'])
+            ->and(Setting::query()->firstOrFail()->revision)->toBe(1)
+            ->and(DB::table(AdoptionStore::Runs)->value('status'))->toBe(AdoptionProgress::Failed)
+            ->and((int) DB::table(AdoptionStore::Checkpoints)->value('processed'))->toBe(1)
+            ->and(DB::table(AdoptionStore::Checkpoints)->value('output_revision'))->toMatch('/^[a-f0-9]{64}$/');
+        Event::assertDispatchedTimes(SettingChanged::class, 1);
+
+        $resumed = settingsAdoptCommand(['phase' => 'apply', 'manifest' => $path, '--fingerprint' => $plan['fingerprint'], '--run' => $run, '--batch-size' => 1]);
+        expect($resumed['status'])->toBe(0)
+            ->and($resumed['state'])->toBe(AdoptionProgress::Applied)
+            ->and($resumed['counts']['overrides'])->toBe(['expected' => 3, 'processed' => 3, 'complete' => true])
+            ->and(Setting::query()->orderBy('key')->pluck('revision', 'key')->all())->toBe(['first' => 1, 'second' => 1, 'third' => 1]);
+        expect(Event::dispatched(SettingChanged::class)->map(static fn (array $arguments): string => $arguments[0]->key)->sort()->values()->all())
+            ->toBe(['core.first', 'core.second', 'core.third']);
+
+        expect(settingsAdoptCommand(['phase' => 'verify', 'manifest' => $path])['verification']['passed'])->toBeTrue()
+            ->and(settingsAdoptCommand(['phase' => 'activate', 'manifest' => $path, '--fingerprint' => $plan['fingerprint']])['state'])->toBe(AdoptionProgress::Active)
+            ->and(app(SettingRepository::class)->get('core.second'))->toBe('staged');
+    } finally {
+        $filesystem->delete($path);
+    }
+});
+
+it('refuses nvl:adopt plans whose expected revisions name unmapped targets', function (): void {
+    /** @var SettingsCacheTestCase $this */
+    $this->artisan('migrate', ['--path' => __DIR__.'/../../core/support/database/migrations', '--realpath' => true])->assertSuccessful();
+    $this->defineSettings([
+        'core.first' => ['type' => SettingType::Boolean, 'default' => false],
+        'core.second' => ['type' => SettingType::Boolean, 'default' => false],
+    ]);
+    app()->instance(SettingsAuthorization::class, new class implements SettingsAuthorization
+    {
+        public function authorize(Authenticatable|SystemActor $actor, SettingAbility $ability, ?string $key = null): void {}
+    });
+    Schema::create('legacy_unmapped_settings', function (Blueprint $table): void {
+        $table->string('key')->primary();
+        $table->text('value');
+    });
+    DB::table('legacy_unmapped_settings')->insert(['key' => 'first.old', 'value' => '1']);
+    $filesystem = app(Filesystem::class);
+    $path = storage_path('framework/testing/settings-unmapped-adoption-'.Str::uuid().'.json');
+    $filesystem->ensureDirectoryExists(dirname($path));
+    $filesystem->put($path, json_encode([
+        'version' => 1, 'source_table' => 'legacy_unmapped_settings', 'expected_count' => 1,
+        'key_replacements' => ['first.old' => 'core.first'],
+        'expected_revisions' => ['core.first' => 0, 'core.second' => 0],
+    ], JSON_THROW_ON_ERROR));
+
+    try {
+        $plan = settingsAdoptCommand(['phase' => 'plan', 'manifest' => $path]);
+
+        expect($plan['status'])->toBe(1)
+            ->and($plan['error'])->toContain('expected_revisions must contain mapped target keys')
+            ->and(DB::table(AdoptionStore::Runs)->count())->toBe(0)
+            ->and(Setting::query()->count())->toBe(0);
+    } finally {
+        $filesystem->delete($path);
     }
 });

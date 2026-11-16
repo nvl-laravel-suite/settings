@@ -110,4 +110,6 @@ After reviewing the plan, `nvl:settings:sync` reconciles definitions without ove
 
 For composite sources, specify `scope_column` and nest the key replacement map under each source scope. Use `value_encoding: "json"` for JSON source values and `preserve_identity: true` for UUIDs and UTC timestamps. An explicit `orphan_policy: "report"` leaves each reported source row intact. Include the reviewed `fingerprint` for extended manifests and run `--verify` after apply and before host cutover.
 
+For checkpointed batches, run `nvl:adopt settings plan|apply|verify|activate <manifest.json>` with the same manifest after enabling the Core adoption tables. Committed batches survive a failure; resume `apply` with `--run` and keep legacy writers stopped until verify and activate pass.
+
 Apply writes and reconciliation share one target transaction, so a stale revision/count/definition mismatch rolls back the import. This imports an already-staged source; it does not invent key mappings or convert schemas. Doctor returns bounded `key`, `severity`, `passed`, `message` diagnostics. Test definitions, exact revisions, null/window behavior, configured models, real owner admission, actual cache/outer-rollback semantics and config restoration through focused host tests.

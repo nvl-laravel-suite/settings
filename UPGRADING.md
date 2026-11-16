@@ -1,6 +1,6 @@
 # Upgrading NVL Settings to Light
 
-Light requires PHP 8.4, Laravel 13 and Core 6. The package no longer requires Spatie Laravel Data, TypeScript Transformer, or Tenancy at runtime. Native Ownership is optional. Refresh the package lockfile and use a no dev Composer install to verify a production host.
+Light requires PHP 8.4, Laravel 13 and Core 7. The package no longer requires Spatie Laravel Data, TypeScript Transformer, or Tenancy at runtime. Native Ownership is optional. Refresh the package lockfile and use a no dev Composer install to verify a production host.
 
 ## Replace management integrations
 
@@ -23,6 +23,10 @@ Move request metadata collection into a consumer `SettingsAuditContextProvider`.
 `nvl:settings:validate`, `nvl:settings:sync --dry-run`, and `nvl:settings:sync` keep their deployment purpose. Sync reconciles definitions and preserves valid live overrides. It cannot act as an unversioned override writer. Do not use an old `setMany` or manager mutation method for imports.
 
 Version 1 adoption manifests require an `expected_revisions` object keyed by every mapped canonical target. Use `0` for an absent row and the exact revision for an existing row. `--apply` passes `SystemActor::Background`; bind `SettingsAuthorization` to admit that operation explicitly. The import validates source values, writes through `SettingWriter` in one target transaction and reconciles before commit. Any failure rolls back all targets. The plan is read only and returns counts without values.
+
+### Checkpointed adoption through nvl:adopt
+
+Adoption runs through nvl:adopt with reviewed, checkpointed batches and an explicit activate step. Committed batches survive a failure. Keep writers stopped until verify and activate pass. SettingsAdopter::execute() stays atomic in 7.x. Run `php artisan nvl:adopt settings plan|apply|verify|activate <manifest.json>` with the same manifest `nvl:settings:adopt` takes; `apply` and `activate` require the reviewed `--fingerprint`, and a failed `apply` resumes with `--run`. Each batch writes its overrides through `SettingWriter` at the reviewed expected revision and commits with its checkpoint, so cache invalidation and `SettingChanged` fire once per committed write. A target that changed after it was staged blocks the plan instead of being overwritten. Publish and run the Core adoption migration (`nvl-core.adoption.migrations.enabled`) first. Batching happens only through `nvl:adopt`; `nvl:settings:adopt` and `SettingsAdopter::execute()` still roll back every target on any failure.
 
 ## Native ownership and configuration
 

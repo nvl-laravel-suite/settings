@@ -77,6 +77,8 @@ Freeze legacy writes while staging. For extended manifests, copy the plan's `fin
 
 Source reads stop after the declared count plus one sentinel row, rejecting oversized staging tables without loading all their values into application memory.
 
+For large sources, run `php artisan nvl:adopt settings plan|apply|verify|activate <manifest.json>` with the same manifest. It needs the Core adoption tables (`nvl-core.adoption.migrations.enabled`). `apply` and `activate` take the reviewed `--fingerprint`; a failed `apply` resumes with `--run`. Each committed batch writes through `SettingWriter` at the reviewed revision and survives a later failure, so keep legacy writers stopped until verify and activate pass. `nvl:settings:adopt` keeps its all-or-nothing transaction.
+
 ## Setting change subject reference
 
 `SettingChanged` contains a string ID, canonical key, revision, operation, `SettingAuditContext`, and scalar `SettingSubjectReference` (`type` is `nvl_setting`). It contains no setting value or model. The explicit principal supplies audit actor identity. An optional consumer supplied `SettingsAuditContextProvider` can add bounded request metadata; the package default supplies none and never reads ambient Request or Auth. See [event schema](docs/events.md).

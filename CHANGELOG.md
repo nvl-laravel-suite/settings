@@ -5,6 +5,10 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Adoption runs through nvl:adopt with reviewed, checkpointed batches and an explicit activate step. Committed batches survive a failure. Keep writers stopped until verify and activate pass. SettingsAdopter::execute() stays atomic in 7.x. The `settings` adapter batches overrides by source (scope, key) through `SettingWriter`, skips overrides that already match on resume, and stores a digest of the written revisions with each checkpoint. `nvl:settings:adopt` is unchanged.
+
 ## [7.1.0] - 2026-11-16
 
 ### Highlights

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 use Nvl\Ownership\Services\OwnershipAdoptionRegistry;
+use Nvl\Settings\Adoption\SettingsAdoptionAdapter;
 use Nvl\Settings\Console\Commands\AdoptCommand;
 use Nvl\Settings\Console\Commands\CacheCommand;
 use Nvl\Settings\Console\Commands\ClearCommand;
@@ -41,6 +42,7 @@ use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\SettingManager;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingsRules;
+use Nvl\Support\Adoption\AdoptionRegistry;
 use Nvl\Support\Doctor\PackageDoctorContributor;
 use Nvl\Support\Globals\GlobalNames;
 use Nvl\Support\Ownership\Contracts\OwnershipIntegratedProvider;
@@ -102,6 +104,7 @@ final class SettingsServiceProvider extends ServiceProvider implements Ownership
     {
         $this->app->make(OwnershipRegistrar::class)->register($this->app->make(OwnershipResourceRegistry::class), $this->app->make('config')->get('nvl-ownership.enabled') === true);
         $this->app->make(OwnershipContextParticipants::class)->register(SettingsContextParticipant::class);
+        $this->app->make(AdoptionRegistry::class)->register('settings', SettingsAdoptionAdapter::class);
         $this->app->make(GlobalNames::class)->translations('settings', __DIR__.'/../../lang', $this->app->make('translation.loader'));
         $this->publishes([
             __DIR__.'/../../lang' => lang_path('vendor/nvl-settings'),
