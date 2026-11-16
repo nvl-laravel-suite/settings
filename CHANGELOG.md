@@ -5,6 +5,19 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+## [7.1.0] - 2026-11-16
+
+### Highlights
+
+- Adopt legacy settings, support dotted leaf keys, and resolve active overrides, configuration, and caller defaults in order.
+
+<!-- NVL GENERATED CHANGES START -->
+### Changed
+
+- close NVL consumer adoption and portability gaps
+- Merge pull request #21 from nicolasvlachos/codex/consumer-postgresql-validation
+<!-- NVL GENERATED CHANGES END -->
+
 ## [7.0.3] - 2026-11-13
 
 ### Changed
