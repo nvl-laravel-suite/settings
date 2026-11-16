@@ -5,6 +5,8 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+## [7.3.0] - 2026-11-17
+
 ### Fixed
 
 - `SettingWriter` and the `nvl:adopt` settings adapter reload Eloquent actors through Core's `CanonicalActorResolver` on the write connection before every write and every adoption phase, so a lagging read replica, revoked, deleted or substituted actor cannot authorize. The writer's own actor resolver was removed.
@@ -19,6 +21,12 @@ All notable changes to `nvl/settings` are documented here.
 ### Changed
 
 - Documented that definitions stay file-defined: dynamic runtime definitions are host-owned, and adoption imports only overrides of file-defined settings.
+
+<!-- NVL GENERATED CHANGES START -->
+### Changed
+
+- implement the Final spec audit for one release
+<!-- NVL GENERATED CHANGES END -->
 
 ## [7.2.0] - 2026-11-16
 
