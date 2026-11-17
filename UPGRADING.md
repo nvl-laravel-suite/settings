@@ -37,6 +37,11 @@ Adoption runs through nvl:adopt with reviewed, checkpointed batches and an expli
 - A resumed `nvl:adopt settings apply` refuses when an override it already staged was deleted or changed. Find what removed or changed it and restore the staged row before resuming; the run never rewinds or rewrites it.
 - Definitions remain file-defined. Keep runtime create, rename, retype and delete of arbitrary settings in the host, and adopt only overrides of definitions added to source.
 
+## Unreleased: NUL-free text and exact JSON floats
+
+- Text and enum writes, and definition defaults, containing a NUL byte now fail validation instead of being stored (PostgreSQL truncated them at the NUL). Run `php artisan nvl:settings:doctor`: `schema.value-codec` fails for any such row an earlier SQLite or MySQL write stored; rewrite those values without the NUL.
+- JSON settings now serialize floats with their zero fraction, so `['ratio' => 1.0]` reads back as `1.0` instead of `1`. Stored rows are not rewritten and stay valid. A definition whose JSON default holds such a float gets a new definition hash, so the next `nvl:settings:sync` updates its synchronized row once.
+
 ## Native ownership and configuration
 
 Enable and adopt native Ownership separately before using owner scopes. The retired Tenancy bridge is no longer a Settings authority source. Unresolved native context fails closed. Keep config mapped definitions central and opt into `nvl-settings.overrides.enabled`; wrap request work in `PlatformSettingsRuntime::run` where required. Job hooks restore the preceding configuration after success, nested execution or failure. Settings no longer installs management routes or middleware automatically. Recreate only your host's authorized HTTP surface.

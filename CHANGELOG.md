@@ -5,6 +5,11 @@ All notable changes to `nvl/settings` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Text and enum settings reject values containing a NUL byte. PostgreSQL silently truncated such a value at the NUL while the write reported success.
+- JSON settings keep the zero fraction of floats (`1.0` is stored as `1.0`, not `1`), so a value accepted under a float-sensitive rule reads back unchanged and still passes that rule during `nvl:settings:sync` reconciliation.
+
 ## [7.3.0] - 2026-11-17
 
 ### Fixed

@@ -28,6 +28,7 @@ use Nvl\Settings\Services\SettingsDoctor;
 use Nvl\Settings\Services\SettingWriter;
 use Nvl\Settings\Support\DefinitionRepository;
 use Nvl\Settings\Support\SettingsRules;
+use Nvl\Settings\Tests\Fixtures\FloatMapRule;
 use Nvl\Settings\Tests\Fixtures\InteractsWithSettings;
 use Nvl\Settings\Tests\Fixtures\LaravelSettingsAuditContextProvider;
 use Nvl\Settings\Tests\TestCase;
@@ -503,6 +504,32 @@ it('rejects non-canonical stored scalar and temporal values', function (
         '2026-02-30T10:00:00+00:00',
     ],
 ]);
+
+it('round-trips zero-fraction JSON floats so stored overrides still satisfy their rules', function (): void {
+    /** @var TestCase $this */
+    $definitions = [
+        'catalog.ratios' => ['type' => SettingType::Json, 'default' => ['tax' => 0.5], 'rules' => [new FloatMapRule]],
+    ];
+    $this->defineSettings($definitions);
+    settingsSetForTest('catalog.ratios', ['tax' => 1.0, 'fee' => 2.5]);
+
+    $this->defineSettings($definitions);
+    $this->artisan('nvl:settings:sync')->assertSuccessful();
+
+    expect(SettingType::Json->deserialize(SettingType::Json->serialize(['tax' => 1.0])))->toBe(['tax' => 1.0])
+        ->and(app(SettingRepository::class)->get('catalog.ratios'))->toBe(['tax' => 1.0, 'fee' => 2.5]);
+});
+
+it('rejects text containing NUL bytes before any driver can truncate it', function (): void {
+    /** @var TestCase $this */
+    $this->defineSettings([
+        'catalog.label' => ['type' => SettingType::Text, 'default' => 'safe'],
+    ]);
+
+    expect(fn (): array => settingsSetForTest('catalog.label', "before\0after"))->toThrow(ValidationException::class, 'NUL')
+        ->and(Setting::query()->count())->toBe(0)
+        ->and(fn (): ?string => SettingType::Enum->serialize("before\0after"))->toThrow(InvalidArgumentException::class, 'NUL');
+});
 
 it('rejects text values that are not valid UTF-8', function (): void {
     expect(fn (): ?string => SettingType::Text->serialize("\xB1\x31"))

@@ -156,6 +156,12 @@ enum SettingType: string
             );
         }
 
+        if (str_contains($value, "\0")) {
+            throw new InvalidArgumentException(
+                "Settings of type [{$this->value}] cannot contain NUL bytes.",
+            );
+        }
+
         return $value;
     }
 
@@ -170,7 +176,7 @@ enum SettingType: string
             throw new InvalidArgumentException('JSON settings require an array value.');
         }
 
-        return json_encode($value, JSON_THROW_ON_ERROR);
+        return json_encode($value, JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR);
     }
 
     /**
